@@ -26,37 +26,33 @@ function shuffle(array) {
 	return arr;
 }
 
-// Draggable Component
+// Draggable Vocabulary Term
 function DraggableTerm({ term, index, onDragEnd, disabled }) {
 	const pan = useRef(new Animated.ValueXY()).current;
 	const scale = useRef(new Animated.Value(1)).current;
-	const opacity = useRef(new Animated.Value(1)).current;
+	const zIndex = useRef(new Animated.Value(1)).current;
 
 	const panResponder = useRef(
 		PanResponder.create({
 			onStartShouldSetPanResponder: () => !disabled,
 			onMoveShouldSetPanResponder: () => !disabled,
 			onPanResponderGrant: () => {
-				Animated.parallel([
-					Animated.spring(scale, { toValue: 1.1, useNativeDriver: false }),
-					Animated.timing(opacity, { toValue: 0.8, duration: 100, useNativeDriver: false }),
-				]).start();
+				zIndex.setValue(1000);
+				Animated.spring(scale, { toValue: 1.05, useNativeDriver: false }).start();
 			},
 			onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
 			onPanResponderRelease: (e, gesture) => {
-				Animated.parallel([
-					Animated.spring(scale, { toValue: 1, useNativeDriver: false }),
-					Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: false }),
-				]).start();
-
 				// Calculate drop position
 				const dropX = gesture.moveX;
 				const dropY = gesture.moveY;
 
 				onDragEnd(index, dropX, dropY);
 
-				// Reset position
-				Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+				// Reset position and appearance
+				Animated.parallel([
+					Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }),
+					Animated.spring(scale, { toValue: 1, useNativeDriver: false }),
+				]).start(() => zIndex.setValue(1));
 			},
 		})
 	).current;
@@ -65,16 +61,17 @@ function DraggableTerm({ term, index, onDragEnd, disabled }) {
 		<Animated.View
 			{...panResponder.panHandlers}
 			style={[
-				styles.draggableTerm,
-				disabled && styles.draggableTermDisabled,
+				styles.draggableVocab,
 				{
 					transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale: scale }],
-					opacity: opacity,
-					zIndex: 1000,
+					zIndex: zIndex,
 				},
 			]}
 		>
-			<Text style={styles.draggableTermText}>{term}</Text>
+			<View style={styles.vocabNumBadge}>
+				<Text style={styles.vocabNumText}>{index + 1}</Text>
+			</View>
+			<Text style={styles.vocabText}>{term}</Text>
 		</Animated.View>
 	);
 }
@@ -92,7 +89,6 @@ export default function QuizScreen({ route }) {
 	const [dropZones, setDropZones] = useState({});
 
 	const fadeAnim = useRef(new Animated.Value(0)).current;
-	const scrollRef = useRef(null);
 
 	useEffect(() => {
 		loadQuizNames();
@@ -184,25 +180,24 @@ export default function QuizScreen({ route }) {
 	};
 
 	const handleSubmit = async () => {
-		// Check if all answers are filled
-		const allFilled = quizData.every((_, idx) => userAnswers[idx] !== undefined && userAnswers[idx] !== '');
+		const allFilled = quizData.every((_, idx) => userAnswers[idx] !== undefined);
 		if (!allFilled) {
-			Alert.alert('Nicht komplett', 'Bitte fülle alle Zuordnungen aus (Drag & Drop), bevor du einreichst.');
+			Alert.alert('Nicht komplett', 'Bitte ziehe alle Begriffe auf die Fragezeichen.');
 			return;
 		}
 
 		let correct = 0;
 		const details = [];
-		quizData.forEach((item, idx) => {
-			const userInput = parseInt(userAnswers[idx]);
+		quizData.forEach((_, idx) => {
+			const userInputIdx = userAnswers[idx];
 			const correctIndex = quizData.findIndex(q => q.id === shuffledAnswers[idx].id);
-			const isCorrect = userInput === correctIndex;
+			const isCorrect = userInputIdx === correctIndex;
 			if (isCorrect) correct++;
 
 			details.push({
-				query: quizData[userInput].query,
+				query: quizData[userInputIdx].query,
 				description: shuffledAnswers[idx].answer,
-				userAnswer: userInput,
+				userAnswer: userInputIdx,
 				correctAnswer: correctIndex,
 				isCorrect,
 			});
@@ -290,12 +285,15 @@ export default function QuizScreen({ route }) {
 											/>
 										</View>
 										<Text style={styles.detailAnswer}>{item.answer}</Text>
-										<Text style={styles.detailTerm}>
-											Deine Wahl: <Text style={{ fontWeight: 'bold' }}>{quizData[userInputIdx]?.query || '?'}</Text>
-										</Text>
+										<View style={styles.detailTermRow}>
+											<Text style={styles.detailTermLabel}>Deine Wahl:</Text>
+											<Text style={[styles.detailTermValue, { color: isCorrect ? COLORS.success : COLORS.error }]}>
+												({userInputIdx + 1}) {quizData[userInputIdx]?.query}
+											</Text>
+										</View>
 										{!isCorrect && (
 											<Text style={styles.detailCorrection}>
-												Richtig wäre: {quizData[correctIndex].query}
+												Richtig wäre: ({correctIndex + 1}) {quizData[correctIndex].query}
 											</Text>
 										)}
 									</View>
@@ -329,16 +327,12 @@ export default function QuizScreen({ route }) {
 			<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
 				<ScrollView contentContainerStyle={styles.selectContainer}>
 					<Text style={styles.selectTitle}>Quiz auswählen</Text>
-					<Text style={styles.selectSubtitle}>Wähle ein Quiz zum Lernen</Text>
 					{quizNames.map((name) => (
 						<Card key={name} onPress={() => selectQuiz(name)} style={styles.quizCard}>
 							<View style={styles.quizCardContent}>
-								<View>
-									<Text style={styles.quizCardEmoji}>📚</Text>
-								</View>
+								<Text style={styles.quizCardEmoji}>📚</Text>
 								<View style={{ flex: 1, marginLeft: SPACING.lg }}>
 									<Text style={styles.quizCardTitle}>{name}</Text>
-									<Text style={styles.quizCardDesc}>Tippe zum Starten</Text>
 								</View>
 								<Text style={styles.quizCardArrow}>→</Text>
 							</View>
@@ -352,34 +346,7 @@ export default function QuizScreen({ route }) {
 	// QUIZ PLAY VIEW
 	return (
 		<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
-			<View style={styles.poolContainer}>
-				<Text style={styles.poolTitle}>💡 Begriffe ziehen:</Text>
-				<View style={styles.poolWrapper}>
-					{quizData.map((item, idx) => {
-						const isUsed = Object.values(userAnswers).includes(idx);
-						return (
-							<DraggableTerm
-								key={idx}
-								term={item.query}
-								index={idx}
-								onDragEnd={handleDragEnd}
-								disabled={submitted}
-							/>
-						);
-					})}
-				</View>
-			</View>
-
-			<ScrollView
-				ref={scrollRef}
-				contentContainerStyle={styles.quizContainer}
-				onScroll={() => {
-					// Re-measure drop zones when scrolling
-					// In a real app we'd use a more stable DnD lib, but for this custom impl:
-					// We'll just wait for the drag finish which triggers the screen-space measurements
-				}}
-				scrollEventThrottle={16}
-			>
+			<ScrollView contentContainerStyle={styles.quizContainer}>
 				<Animated.View style={{ opacity: fadeAnim }}>
 					{/* Header */}
 					<View style={styles.quizHeader}>
@@ -389,18 +356,43 @@ export default function QuizScreen({ route }) {
 
 					<Text style={styles.quizTitle}>Zuordnungs-Quiz</Text>
 					<Text style={styles.quizInstruction}>
-						Ziehe die Begriffe von oben (Drag & Drop) auf das Fragezeichen-Feld der passenden Beschreibung.
+						Ziehe die Begriffe von links auf die Fragezeichen im rechten Bereich.
 					</Text>
 
-					{/* Table Body */}
+					{/* Table Headers */}
+					<View style={styles.tableHeader}>
+						<Text style={[styles.thText, { width: 40 }]}>#</Text>
+						<Text style={[styles.thText, { flex: 1 }]}>Begriff (Ziehen)</Text>
+						<Text style={[styles.thText, { flex: 1.5, marginLeft: 20 }]}>Beschreibung</Text>
+						<Text style={[styles.thText, { width: 80, textAlign: 'center' }]}>Ziel (?)</Text>
+					</View>
+
+					{/* Table Rows */}
 					{shuffledAnswers.map((item, idx) => (
-						<View
-							key={idx}
-							style={[
-								styles.tableRow,
-								idx % 2 === 0 && styles.tableRowAlt,
-							]}
-						>
+						<View key={idx} style={[styles.tableRow, idx % 2 === 0 && styles.tableRowAlt]}>
+							{/* Index */}
+							<View style={{ width: 40, alignItems: 'center' }}>
+								<Text style={styles.detailNumber}>#{idx + 1}</Text>
+							</View>
+
+							{/* Draggable Term Section (Left) */}
+							<View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+								{idx < quizData.length ? (
+									<DraggableTerm
+										term={quizData[idx].query}
+										index={idx}
+										onDragEnd={handleDragEnd}
+										disabled={submitted}
+									/>
+								) : <View style={{ flex: 1 }} />}
+							</View>
+
+							{/* Description Section (Middle) */}
+							<View style={{ flex: 1.5, paddingHorizontal: SPACING.md }}>
+								<Text style={styles.descText}>{item.answer}</Text>
+							</View>
+
+							{/* Drop Zone Section (Right) */}
 							<View style={styles.colDrop}>
 								<View
 									ref={(ref) => registerDropZone(idx, ref)}
@@ -410,7 +402,7 @@ export default function QuizScreen({ route }) {
 									]}
 								>
 									<Text style={styles.dropZoneText}>
-										{userAnswers[idx] !== undefined ? quizData[userAnswers[idx]].query : '?'}
+										{userAnswers[idx] !== undefined ? (userAnswers[idx] + 1) : '?'}
 									</Text>
 								</View>
 								{userAnswers[idx] !== undefined && (
@@ -425,11 +417,6 @@ export default function QuizScreen({ route }) {
 										<Text style={styles.clearBtnText}>✕</Text>
 									</TouchableOpacity>
 								)}
-							</View>
-							<View style={styles.colDesc}>
-								<Text style={styles.descText}>
-									{item.answer}
-								</Text>
 							</View>
 						</View>
 					))}
@@ -447,261 +434,71 @@ export default function QuizScreen({ route }) {
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
-	// Pool
-	poolContainer: {
-		padding: SPACING.md,
-		backgroundColor: COLORS.surface,
-		borderBottomWidth: 1,
-		borderBottomColor: COLORS.border,
-		...SHADOWS.md,
-	},
-	poolTitle: {
-		color: COLORS.textMuted,
-		fontSize: FONTS.sizes.sm,
-		fontWeight: FONTS.weights.bold,
-		marginBottom: SPACING.sm,
-		textTransform: 'uppercase',
-	},
-	poolWrapper: {
-		flexDirection: 'row',
-		flexWrap: 'wrap',
-		gap: SPACING.sm,
-	},
-	draggableTerm: {
-		paddingVertical: SPACING.sm,
-		paddingHorizontal: SPACING.md,
-		borderRadius: RADIUS.md,
-		backgroundColor: COLORS.primary,
-		borderWidth: 1,
-		borderColor: COLORS.primaryLight,
-		...SHADOWS.glow(COLORS.primary),
-	},
-	draggableTermDisabled: {
-		opacity: 0.5,
-	},
-	draggableTermText: {
-		color: COLORS.white,
-		fontWeight: FONTS.weights.bold,
-		fontSize: FONTS.sizes.sm,
-	},
-
+	container: { flex: 1 },
 	// Select view
-	selectContainer: {
-		padding: SPACING.xxl,
-		paddingTop: SPACING.huge,
-	},
-	selectTitle: {
-		fontSize: FONTS.sizes.xxxl,
-		fontWeight: FONTS.weights.bold,
-		color: COLORS.textPrimary,
-		marginBottom: SPACING.xs,
-	},
-	selectSubtitle: {
-		fontSize: FONTS.sizes.md,
-		color: COLORS.textMuted,
-		marginBottom: SPACING.xxl,
-	},
-	quizCard: {
-		marginBottom: SPACING.md,
-	},
-	quizCardContent: {
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-	quizCardEmoji: {
-		fontSize: 36,
-	},
-	quizCardTitle: {
-		fontSize: FONTS.sizes.lg,
-		fontWeight: FONTS.weights.semiBold,
-		color: COLORS.textPrimary,
-	},
-	quizCardArrow: {
-		fontSize: FONTS.sizes.xxl,
-		color: COLORS.primary,
-		fontWeight: FONTS.weights.bold,
-	},
+	selectContainer: { padding: SPACING.xxl, paddingTop: SPACING.huge },
+	selectTitle: { fontSize: FONTS.sizes.xxxl, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary, marginBottom: SPACING.xxl },
+	quizCard: { marginBottom: SPACING.md },
+	quizCardContent: { flexDirection: 'row', alignItems: 'center' },
+	quizCardEmoji: { fontSize: 32 },
+	quizCardTitle: { fontSize: FONTS.sizes.lg, fontWeight: FONTS.weights.semiBold, color: COLORS.textPrimary },
+	quizCardArrow: { fontSize: 24, color: COLORS.primary },
 
 	// Quiz view
-	quizContainer: {
-		padding: SPACING.lg,
-		paddingBottom: SPACING.huge,
-	},
-	quizHeader: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		marginBottom: SPACING.lg,
-	},
-	quizHeaderUser: {
-		fontSize: FONTS.sizes.md,
-		color: COLORS.textSecondary,
-		fontWeight: FONTS.weights.medium,
-	},
-	quizTitle: {
-		fontSize: FONTS.sizes.xxl,
-		fontWeight: FONTS.weights.bold,
-		color: COLORS.textPrimary,
-		marginBottom: SPACING.xs,
-	},
-	quizInstruction: {
-		fontSize: FONTS.sizes.sm,
-		color: COLORS.textMuted,
-		marginBottom: SPACING.xl,
-		lineHeight: 20,
-	},
+	quizContainer: { padding: SPACING.md, paddingBottom: SPACING.huge },
+	quizHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.lg },
+	quizHeaderUser: { color: COLORS.textSecondary, fontWeight: '500' },
+	quizTitle: { fontSize: 24, fontWeight: 'bold', color: COLORS.textPrimary, marginBottom: 4 },
+	quizInstruction: { color: COLORS.textMuted, fontSize: 13, marginBottom: 20 },
 
 	// Table DnD
-	tableRow: {
+	tableHeader: { flexDirection: 'row', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+	thText: { color: COLORS.primaryLight, fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' },
+	tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border + '30' },
+	tableRowAlt: { backgroundColor: COLORS.white + '05' },
+
+	draggableVocab: {
+		flex: 1,
 		flexDirection: 'row',
+		alignItems: 'center',
 		backgroundColor: COLORS.surface,
-		borderBottomWidth: 1,
-		borderBottomColor: COLORS.border,
-		paddingVertical: SPACING.lg,
-		paddingHorizontal: SPACING.sm,
-		alignItems: 'center',
-		minHeight: 80,
+		padding: 8,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: COLORS.primary + '40',
+		...SHADOWS.sm
 	},
-	tableRowAlt: {
-		backgroundColor: COLORS.surfaceLight + '40',
-	},
-	colDrop: {
-		width: 140,
-		alignItems: 'center',
-		flexDirection: 'row',
-	},
-	dropZone: {
-		flex: 1,
-		height: 44,
-		borderRadius: RADIUS.md,
-		borderWidth: 2,
-		borderStyle: 'dashed',
-		borderColor: COLORS.primary + '60',
-		backgroundColor: COLORS.background,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	dropZoneFilled: {
-		borderStyle: 'solid',
-		borderColor: COLORS.success,
-		backgroundColor: COLORS.success + '10',
-	},
-	dropZoneText: {
-		color: COLORS.textMuted,
-		fontSize: FONTS.sizes.xs,
-		textAlign: 'center',
-		fontWeight: FONTS.weights.bold,
-	},
-	clearBtn: {
-		marginLeft: SPACING.xs,
-		padding: SPACING.xs,
-	},
-	clearBtnText: {
-		color: COLORS.error,
-		fontSize: 18,
-	},
-	colDesc: {
-		flex: 1,
-		paddingLeft: SPACING.md,
-	},
-	descText: {
-		color: COLORS.textSecondary,
-		fontSize: FONTS.sizes.sm,
-		lineHeight: 20,
-	},
-	submitButton: {
-		marginTop: SPACING.xxl,
-	},
+	vocabNumBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
+	vocabNumText: { color: COLORS.white, fontSize: 11, fontWeight: 'bold' },
+	vocabText: { color: COLORS.textPrimary, fontSize: 13, fontWeight: '500' },
+
+	descText: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 18 },
+
+	colDrop: { width: 80, alignItems: 'center', flexDirection: 'row', justifyContent: 'flex-end' },
+	dropZone: { width: 44, height: 44, borderRadius: 8, borderWidth: 2, borderStyle: 'dashed', borderColor: COLORS.primary + '60', backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
+	dropZoneFilled: { borderStyle: 'solid', borderColor: COLORS.success, backgroundColor: COLORS.success + '15' },
+	dropZoneText: { color: COLORS.textPrimary, fontSize: 16, fontWeight: 'bold' },
+	clearBtn: { padding: 4, marginLeft: 4 },
+	clearBtnText: { color: COLORS.error, fontSize: 16 },
+
+	submitButton: { marginTop: 30 },
 
 	// Result view
-	resultContainer: {
-		padding: SPACING.xxl,
-		paddingTop: SPACING.huge,
-		alignItems: 'center',
-	},
-	resultEmoji: {
-		fontSize: 72,
-		marginBottom: SPACING.lg,
-	},
-	resultTitle: {
-		fontSize: FONTS.sizes.xxxl,
-		fontWeight: FONTS.weights.bold,
-		color: COLORS.textPrimary,
-		marginBottom: SPACING.sm,
-	},
-	resultSubtitle: {
-		fontSize: FONTS.sizes.lg,
-		color: COLORS.textSecondary,
-		marginBottom: SPACING.xxl,
-		textAlign: 'center',
-	},
-	scoreCircle: {
-		width: 120,
-		height: 120,
-		borderRadius: 60,
-		borderWidth: 4,
-		alignItems: 'center',
-		justifyContent: 'center',
-		marginBottom: SPACING.xxl,
-		backgroundColor: COLORS.surface,
-		...SHADOWS.lg,
-	},
-	scorePercentage: {
-		fontSize: FONTS.sizes.xxxl,
-		fontWeight: FONTS.weights.extraBold,
-	},
-	statsRow: {
-		flexDirection: 'row',
-		marginBottom: SPACING.xxl,
-		width: '100%',
-	},
-	detailCard: {
-		width: '100%',
-		marginBottom: SPACING.xxl,
-	},
-	detailTitle: {
-		fontSize: FONTS.sizes.lg,
-		fontWeight: FONTS.weights.bold,
-		color: COLORS.textPrimary,
-		marginBottom: SPACING.lg,
-	},
-	detailRow: {
-		borderLeftWidth: 3,
-		paddingLeft: SPACING.md,
-		marginBottom: SPACING.lg,
-	},
-	detailHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginBottom: SPACING.xs,
-	},
-	detailNumber: {
-		fontSize: FONTS.sizes.sm,
-		color: COLORS.textMuted,
-		fontWeight: FONTS.weights.bold,
-	},
-	detailTerm: {
-		fontSize: FONTS.sizes.sm,
-		color: COLORS.textSecondary,
-		marginTop: 4,
-	},
-	detailAnswer: {
-		fontSize: FONTS.sizes.md,
-		color: COLORS.textPrimary,
-		fontWeight: FONTS.weights.semiBold,
-	},
-	detailCorrection: {
-		fontSize: FONTS.sizes.xs,
-		color: COLORS.error,
-		marginTop: 4,
-		fontStyle: 'italic',
-	},
-	buttonRow: {
-		flexDirection: 'row',
-		width: '100%',
-	},
+	resultContainer: { padding: 24, alignItems: 'center' },
+	resultEmoji: { fontSize: 64, marginBottom: 16 },
+	resultTitle: { fontSize: 32, fontWeight: 'bold', color: COLORS.textPrimary },
+	resultSubtitle: { fontSize: 18, color: COLORS.textSecondary, marginBottom: 24 },
+	scoreCircle: { width: 100, height: 100, borderRadius: 50, borderWidth: 4, alignItems: 'center', justifyContent: 'center', marginBottom: 24, backgroundColor: COLORS.surface },
+	scorePercentage: { fontSize: 28, fontWeight: 'bold' },
+	detailCard: { width: '100%' },
+	detailTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.textPrimary, marginBottom: 16 },
+	detailRow: { borderLeftWidth: 3, paddingLeft: 12, marginBottom: 16 },
+	detailHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+	detailNumber: { color: COLORS.textMuted, fontSize: 12 },
+	detailAnswer: { fontSize: 15, color: COLORS.textPrimary, fontWeight: '500', marginBottom: 4 },
+	detailTermRow: { flexDirection: 'row', marginTop: 2 },
+	detailTermLabel: { fontSize: 13, color: COLORS.textSecondary, marginRight: 6 },
+	detailTermValue: { fontSize: 13, fontWeight: 'bold' },
+	detailCorrection: { fontSize: 12, color: COLORS.error, marginTop: 4, fontStyle: 'italic' },
+	buttonRow: { flexDirection: 'row', width: '100%', marginTop: 24 },
 });
