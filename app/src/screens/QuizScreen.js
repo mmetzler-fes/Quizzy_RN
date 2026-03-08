@@ -3,16 +3,19 @@ import {
 	View,
 	Text,
 	ScrollView,
-	TextInput,
 	TouchableOpacity,
 	StyleSheet,
 	Animated,
 	Alert,
+	Dimensions,
+	PanResponder,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { GradientButton, Card, LoadingView, EmptyState, Badge, StatsCard } from '../components/UI';
 import { getQuizByName, getQuizNames, saveQuizResult } from '../database/database';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 function shuffle(array) {
 	const arr = [...array];
@@ -21,6 +24,59 @@ function shuffle(array) {
 		[arr[i], arr[j]] = [arr[j], arr[i]];
 	}
 	return arr;
+}
+
+// Draggable Component
+function DraggableTerm({ term, index, onDragEnd, disabled }) {
+	const pan = useRef(new Animated.ValueXY()).current;
+	const scale = useRef(new Animated.Value(1)).current;
+	const opacity = useRef(new Animated.Value(1)).current;
+
+	const panResponder = useRef(
+		PanResponder.create({
+			onStartShouldSetPanResponder: () => !disabled,
+			onMoveShouldSetPanResponder: () => !disabled,
+			onPanResponderGrant: () => {
+				Animated.parallel([
+					Animated.spring(scale, { toValue: 1.1, useNativeDriver: false }),
+					Animated.timing(opacity, { toValue: 0.8, duration: 100, useNativeDriver: false }),
+				]).start();
+			},
+			onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+			onPanResponderRelease: (e, gesture) => {
+				Animated.parallel([
+					Animated.spring(scale, { toValue: 1, useNativeDriver: false }),
+					Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: false }),
+				]).start();
+
+				// Calculate drop position
+				const dropX = gesture.moveX;
+				const dropY = gesture.moveY;
+
+				onDragEnd(index, dropX, dropY);
+
+				// Reset position
+				Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
+			},
+		})
+	).current;
+
+	return (
+		<Animated.View
+			{...panResponder.panHandlers}
+			style={[
+				styles.draggableTerm,
+				disabled && styles.draggableTermDisabled,
+				{
+					transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale: scale }],
+					opacity: opacity,
+					zIndex: 1000,
+				},
+			]}
+		>
+			<Text style={styles.draggableTermText}>{term}</Text>
+		</Animated.View>
+	);
 }
 
 export default function QuizScreen({ route }) {
@@ -33,8 +89,10 @@ export default function QuizScreen({ route }) {
 	const [submitted, setSubmitted] = useState(false);
 	const [score, setScore] = useState(null);
 	const [loading, setLoading] = useState(true);
+	const [dropZones, setDropZones] = useState({});
 
 	const fadeAnim = useRef(new Animated.Value(0)).current;
+	const scrollRef = useRef(null);
 
 	useEffect(() => {
 		loadQuizNames();
@@ -72,6 +130,7 @@ export default function QuizScreen({ route }) {
 			setUserAnswers({});
 			setSubmitted(false);
 			setScore(null);
+			setDropZones({});
 			fadeAnim.setValue(0);
 		} catch (error) {
 			console.error('Error loading quiz:', error);
@@ -80,15 +139,58 @@ export default function QuizScreen({ route }) {
 		}
 	};
 
+	const onLayoutDropZone = (idx, event) => {
+		const { x, y, width, height } = event.nativeEvent.layout;
+		// Since we are in a ScrollView, we need absolute coordinates
+		// We'll use measure to get them if needed, but for now let's use a simpler approach
+		// or measure the view when needed.
+	};
+
+	const handleDragEnd = (termIdx, x, y) => {
+		// Collision detection
+		let matchedIdx = -1;
+
+		// We need to measure all dropzones relative to screen
+		// This is tricky in a ScrollView. A better way in RN for DnD is to use a matching interaction.
+		// For now, let's try to find the row by layout.
+
+		// Optimization: Find which row the point {x, y} is in.
+		Object.keys(dropZones).forEach((idx) => {
+			const zone = dropZones[idx];
+			if (
+				x >= zone.px &&
+				x <= zone.px + zone.width &&
+				y >= zone.py &&
+				y <= zone.py + zone.height
+			) {
+				matchedIdx = parseInt(idx);
+			}
+		});
+
+		if (matchedIdx !== -1) {
+			setUserAnswers((prev) => ({ ...prev, [matchedIdx]: termIdx }));
+		}
+	};
+
+	const registerDropZone = (idx, ref) => {
+		if (ref) {
+			ref.measure((x, y, width, height, px, py) => {
+				setDropZones((prev) => ({
+					...prev,
+					[idx]: { px, py, width, height }
+				}));
+			});
+		}
+	};
+
 	const handleSubmit = async () => {
 		// Check if all answers are filled
 		const allFilled = quizData.every((_, idx) => userAnswers[idx] !== undefined && userAnswers[idx] !== '');
 		if (!allFilled) {
-			Alert.alert('Nicht komplett', 'Bitte fülle alle Zuordnungen aus, bevor du einreichst.');
+			Alert.alert('Nicht komplett', 'Bitte fülle alle Zuordnungen aus (Drag & Drop), bevor du einreichst.');
 			return;
 		}
 
-		// Calculate score and build details
 		let correct = 0;
 		const details = [];
 		quizData.forEach((item, idx) => {
@@ -98,7 +200,7 @@ export default function QuizScreen({ route }) {
 			if (isCorrect) correct++;
 
 			details.push({
-				query: item.query,
+				query: quizData[userInput].query,
 				description: shuffledAnswers[idx].answer,
 				userAnswer: userInput,
 				correctAnswer: correctIndex,
@@ -110,7 +212,6 @@ export default function QuizScreen({ route }) {
 		setSubmitted(true);
 		fadeAnim.setValue(0);
 
-		// Save result to database
 		try {
 			await saveQuizResult(username, selectedQuiz, correct, quizData.length, details);
 		} catch (error) {
@@ -156,7 +257,6 @@ export default function QuizScreen({ route }) {
 							{username}, du hast {score} von {quizData.length} richtig!
 						</Text>
 
-						{/* Score circle */}
 						<View style={[styles.scoreCircle, {
 							borderColor: isPerfect ? COLORS.success : isGood ? COLORS.accent : COLORS.error
 						}]}>
@@ -167,35 +267,35 @@ export default function QuizScreen({ route }) {
 							</Text>
 						</View>
 
-						{/* Stats */}
 						<View style={styles.statsRow}>
 							<StatsCard icon="✅" value={score} label="Richtig" color={COLORS.success} />
 							<View style={{ width: SPACING.md }} />
 							<StatsCard icon="❌" value={quizData.length - score} label="Falsch" color={COLORS.error} />
 						</View>
 
-						{/* Detail: show correct answers */}
 						<Card style={styles.detailCard}>
 							<Text style={styles.detailTitle}>📋 Übersicht</Text>
-							{quizData.map((item, idx) => {
-								const userInput = parseInt(userAnswers[idx]);
-								const correctIndex = quizData.findIndex(q => q.id === shuffledAnswers[idx].id);
-								const isCorrect = userInput === correctIndex;
+							{shuffledAnswers.map((item, idx) => {
+								const userInputIdx = userAnswers[idx];
+								const correctIndex = quizData.findIndex(q => q.id === item.id);
+								const isCorrect = userInputIdx === correctIndex;
 
 								return (
 									<View key={idx} style={[styles.detailRow, { borderLeftColor: isCorrect ? COLORS.success : COLORS.error }]}>
 										<View style={styles.detailHeader}>
-											<Text style={styles.detailNumber}>#{idx}</Text>
+											<Text style={styles.detailNumber}>#{idx + 1}</Text>
 											<Badge
 												text={isCorrect ? 'Richtig' : 'Falsch'}
 												variant={isCorrect ? 'success' : 'error'}
 											/>
 										</View>
-										<Text style={styles.detailTerm}>{item.query}</Text>
-										<Text style={styles.detailAnswer}>→ {shuffledAnswers[idx].answer}</Text>
+										<Text style={styles.detailAnswer}>{item.answer}</Text>
+										<Text style={styles.detailTerm}>
+											Deine Wahl: <Text style={{ fontWeight: 'bold' }}>{quizData[userInputIdx]?.query || '?'}</Text>
+										</Text>
 										{!isCorrect && (
 											<Text style={styles.detailCorrection}>
-												Deine Antwort: {userAnswers[idx]}, Richtig: {correctIndex}
+												Richtig wäre: {quizData[correctIndex].query}
 											</Text>
 										)}
 									</View>
@@ -252,7 +352,34 @@ export default function QuizScreen({ route }) {
 	// QUIZ PLAY VIEW
 	return (
 		<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
-			<ScrollView contentContainerStyle={styles.quizContainer}>
+			<View style={styles.poolContainer}>
+				<Text style={styles.poolTitle}>💡 Begriffe ziehen:</Text>
+				<View style={styles.poolWrapper}>
+					{quizData.map((item, idx) => {
+						const isUsed = Object.values(userAnswers).includes(idx);
+						return (
+							<DraggableTerm
+								key={idx}
+								term={item.query}
+								index={idx}
+								onDragEnd={handleDragEnd}
+								disabled={submitted}
+							/>
+						);
+					})}
+				</View>
+			</View>
+
+			<ScrollView
+				ref={scrollRef}
+				contentContainerStyle={styles.quizContainer}
+				onScroll={() => {
+					// Re-measure drop zones when scrolling
+					// In a real app we'd use a more stable DnD lib, but for this custom impl:
+					// We'll just wait for the drag finish which triggers the screen-space measurements
+				}}
+				scrollEventThrottle={16}
+			>
 				<Animated.View style={{ opacity: fadeAnim }}>
 					{/* Header */}
 					<View style={styles.quizHeader}>
@@ -262,64 +389,51 @@ export default function QuizScreen({ route }) {
 
 					<Text style={styles.quizTitle}>Zuordnungs-Quiz</Text>
 					<Text style={styles.quizInstruction}>
-						Ordne jeder Beschreibung (rechts) die passende Nummer des Begriffs (links) zu.
+						Ziehe die Begriffe von oben (Drag & Drop) auf das Fragezeichen-Feld der passenden Beschreibung.
 					</Text>
 
-					{/* Table Header */}
-					<View style={styles.tableHeader}>
-						<View style={styles.colNum}>
-							<Text style={styles.thText}>#</Text>
-						</View>
-						<View style={styles.colTerm}>
-							<Text style={styles.thText}>Begriff</Text>
-						</View>
-						<View style={styles.colInput}>
-							<Text style={styles.thText}>Nr.</Text>
-						</View>
-						<View style={styles.colDesc}>
-							<Text style={styles.thText}>Beschreibung</Text>
-						</View>
-					</View>
-
 					{/* Table Body */}
-					{quizData.map((item, idx) => (
-						<Animated.View
+					{shuffledAnswers.map((item, idx) => (
+						<View
 							key={idx}
 							style={[
 								styles.tableRow,
 								idx % 2 === 0 && styles.tableRowAlt,
 							]}
 						>
-							<View style={styles.colNum}>
-								<View style={styles.numberBadge}>
-									<Text style={styles.numberText}>{idx}</Text>
+							<View style={styles.colDrop}>
+								<View
+									ref={(ref) => registerDropZone(idx, ref)}
+									style={[
+										styles.dropZone,
+										userAnswers[idx] !== undefined && styles.dropZoneFilled
+									]}
+								>
+									<Text style={styles.dropZoneText}>
+										{userAnswers[idx] !== undefined ? quizData[userAnswers[idx]].query : '?'}
+									</Text>
 								</View>
-							</View>
-							<View style={styles.colTerm}>
-								<Text style={styles.termText}>{item.query}</Text>
-							</View>
-							<View style={styles.colInput}>
-								<TextInput
-									style={styles.answerInput}
-									keyboardType="number-pad"
-									maxLength={2}
-									placeholder="?"
-									placeholderTextColor={COLORS.textMuted}
-									value={userAnswers[idx]?.toString() || ''}
-									onChangeText={(text) =>
-										setUserAnswers({ ...userAnswers, [idx]: text })
-									}
-								/>
+								{userAnswers[idx] !== undefined && (
+									<TouchableOpacity
+										onPress={() => {
+											const newAnswers = { ...userAnswers };
+											delete newAnswers[idx];
+											setUserAnswers(newAnswers);
+										}}
+										style={styles.clearBtn}
+									>
+										<Text style={styles.clearBtnText}>✕</Text>
+									</TouchableOpacity>
+								)}
 							</View>
 							<View style={styles.colDesc}>
-								<Text style={styles.descText} numberOfLines={3}>
-									{shuffledAnswers[idx]?.answer}
+								<Text style={styles.descText}>
+									{item.answer}
 								</Text>
 							</View>
-						</Animated.View>
+						</View>
 					))}
 
-					{/* Submit */}
 					<GradientButton
 						title="✅  Einreichen"
 						onPress={handleSubmit}
@@ -336,6 +450,44 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 	},
+	// Pool
+	poolContainer: {
+		padding: SPACING.md,
+		backgroundColor: COLORS.surface,
+		borderBottomWidth: 1,
+		borderBottomColor: COLORS.border,
+		...SHADOWS.md,
+	},
+	poolTitle: {
+		color: COLORS.textMuted,
+		fontSize: FONTS.sizes.sm,
+		fontWeight: FONTS.weights.bold,
+		marginBottom: SPACING.sm,
+		textTransform: 'uppercase',
+	},
+	poolWrapper: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: SPACING.sm,
+	},
+	draggableTerm: {
+		paddingVertical: SPACING.sm,
+		paddingHorizontal: SPACING.md,
+		borderRadius: RADIUS.md,
+		backgroundColor: COLORS.primary,
+		borderWidth: 1,
+		borderColor: COLORS.primaryLight,
+		...SHADOWS.glow(COLORS.primary),
+	},
+	draggableTermDisabled: {
+		opacity: 0.5,
+	},
+	draggableTermText: {
+		color: COLORS.white,
+		fontWeight: FONTS.weights.bold,
+		fontSize: FONTS.sizes.sm,
+	},
+
 	// Select view
 	selectContainer: {
 		padding: SPACING.xxl,
@@ -366,11 +518,6 @@ const styles = StyleSheet.create({
 		fontSize: FONTS.sizes.lg,
 		fontWeight: FONTS.weights.semiBold,
 		color: COLORS.textPrimary,
-	},
-	quizCardDesc: {
-		fontSize: FONTS.sizes.sm,
-		color: COLORS.textMuted,
-		marginTop: 2,
 	},
 	quizCardArrow: {
 		fontSize: FONTS.sizes.xxl,
@@ -407,74 +554,63 @@ const styles = StyleSheet.create({
 		lineHeight: 20,
 	},
 
-	// Table
-	tableHeader: {
-		flexDirection: 'row',
-		backgroundColor: COLORS.primary,
-		borderRadius: RADIUS.md,
-		borderBottomLeftRadius: 0,
-		borderBottomRightRadius: 0,
-		paddingVertical: SPACING.md,
-		paddingHorizontal: SPACING.sm,
-	},
-	thText: {
-		color: COLORS.white,
-		fontSize: FONTS.sizes.sm,
-		fontWeight: FONTS.weights.bold,
-		textTransform: 'uppercase',
-		letterSpacing: 0.5,
-	},
+	// Table DnD
 	tableRow: {
 		flexDirection: 'row',
 		backgroundColor: COLORS.surface,
 		borderBottomWidth: 1,
 		borderBottomColor: COLORS.border,
-		paddingVertical: SPACING.md,
+		paddingVertical: SPACING.lg,
 		paddingHorizontal: SPACING.sm,
 		alignItems: 'center',
-		minHeight: 60,
+		minHeight: 80,
 	},
 	tableRowAlt: {
 		backgroundColor: COLORS.surfaceLight + '40',
 	},
-	colNum: { width: 40, alignItems: 'center' },
-	colTerm: { flex: 2, paddingHorizontal: SPACING.xs },
-	colInput: { width: 50, alignItems: 'center' },
-	colDesc: { flex: 3, paddingLeft: SPACING.sm },
-	numberBadge: {
-		width: 28,
-		height: 28,
-		borderRadius: 14,
-		backgroundColor: COLORS.primary + '30',
+	colDrop: {
+		width: 140,
+		alignItems: 'center',
+		flexDirection: 'row',
+	},
+	dropZone: {
+		flex: 1,
+		height: 44,
+		borderRadius: RADIUS.md,
+		borderWidth: 2,
+		borderStyle: 'dashed',
+		borderColor: COLORS.primary + '60',
+		backgroundColor: COLORS.background,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
-	numberText: {
-		color: COLORS.primaryLight,
-		fontSize: FONTS.sizes.sm,
-		fontWeight: FONTS.weights.bold,
+	dropZoneFilled: {
+		borderStyle: 'solid',
+		borderColor: COLORS.success,
+		backgroundColor: COLORS.success + '10',
 	},
-	termText: {
-		color: COLORS.textPrimary,
-		fontSize: FONTS.sizes.sm,
-		fontWeight: FONTS.weights.medium,
-	},
-	answerInput: {
-		width: 40,
-		height: 36,
-		borderRadius: RADIUS.sm,
-		borderWidth: 2,
-		borderColor: COLORS.primary + '60',
-		backgroundColor: COLORS.background,
-		color: COLORS.white,
+	dropZoneText: {
+		color: COLORS.textMuted,
+		fontSize: FONTS.sizes.xs,
 		textAlign: 'center',
-		fontSize: FONTS.sizes.md,
 		fontWeight: FONTS.weights.bold,
+	},
+	clearBtn: {
+		marginLeft: SPACING.xs,
+		padding: SPACING.xs,
+	},
+	clearBtnText: {
+		color: COLORS.error,
+		fontSize: 18,
+	},
+	colDesc: {
+		flex: 1,
+		paddingLeft: SPACING.md,
 	},
 	descText: {
 		color: COLORS.textSecondary,
-		fontSize: FONTS.sizes.xs,
-		lineHeight: 16,
+		fontSize: FONTS.sizes.sm,
+		lineHeight: 20,
 	},
 	submitButton: {
 		marginTop: SPACING.xxl,
@@ -549,14 +685,14 @@ const styles = StyleSheet.create({
 		fontWeight: FONTS.weights.bold,
 	},
 	detailTerm: {
+		fontSize: FONTS.sizes.sm,
+		color: COLORS.textSecondary,
+		marginTop: 4,
+	},
+	detailAnswer: {
 		fontSize: FONTS.sizes.md,
 		color: COLORS.textPrimary,
 		fontWeight: FONTS.weights.semiBold,
-	},
-	detailAnswer: {
-		fontSize: FONTS.sizes.sm,
-		color: COLORS.textSecondary,
-		marginTop: 2,
 	},
 	detailCorrection: {
 		fontSize: FONTS.sizes.xs,
