@@ -341,7 +341,7 @@ export default function QuizScreen({ route }) {
 									]}
 								>
 									<Text style={styles.dropZoneText}>
-										{userAnswers[idx] !== undefined ? (userAnswers[idx] + 1) : '?'}
+										{userAnswers[idx] !== undefined ? quizData[userAnswers[idx]].query : '?'}
 									</Text>
 								</View>
 								{userAnswers[idx] !== undefined && (
@@ -396,10 +396,10 @@ const styles = StyleSheet.create({
 
 	descText: { color: COLORS.textSecondary, fontSize: 12, lineHeight: 16 },
 
-	dropZone: { width: 56, height: 56, borderRadius: 10, borderWidth: 2, borderStyle: 'dashed', borderColor: COLORS.primary + '40', backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
+	dropZone: { width: 120, height: 50, borderRadius: 10, borderWidth: 2, borderStyle: 'dashed', borderColor: COLORS.primary + '40', backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
 	dropZoneFilled: { borderStyle: 'solid', borderColor: COLORS.success, backgroundColor: COLORS.success + '10' },
-	dropZoneHover: { borderColor: COLORS.accent, backgroundColor: COLORS.accent + '20', transform: [{ scale: 1.1 }] },
-	dropZoneText: { color: COLORS.textPrimary, fontSize: 20, fontWeight: 'bold' },
+	dropZoneHover: { borderColor: COLORS.accent, backgroundColor: COLORS.accent + '20', transform: [{ scale: 1.05 }] },
+	dropZoneText: { color: COLORS.textPrimary, fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
 	clearBtn: { padding: 4, marginTop: 4 },
 	clearBtnText: { color: COLORS.error, fontSize: 14 },
 
