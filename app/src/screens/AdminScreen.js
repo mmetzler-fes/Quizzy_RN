@@ -366,7 +366,11 @@ function QuizManagementTab() {
 	const handleExportTopic = async (name) => {
 		try {
 			const items = await getQuizByName(name);
-			const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(items, null, 2));
+			const formattedData = {
+				quizname: name,
+				items: items.map(item => ({ query: item.query, answer: item.answer }))
+			};
+			const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(formattedData, null, 2));
 			if (Platform.OS === 'web') {
 				const a = document.createElement('a');
 				a.href = dataStr;
@@ -392,18 +396,33 @@ function QuizManagementTab() {
 				reader.onload = async (event) => {
 					try {
 						const data = JSON.parse(event.target.result);
-						if (!Array.isArray(data)) throw new Error('Format ungültig');
-						let importCount = 0;
-						for (const item of data) {
-							if (item.quizname && item.query && item.answer) {
-								await addQuizItem(item.quizname, item.query, item.answer);
-								importCount++;
+
+						// Support new hierarchical format OR fallback to old array formatting just in case
+						if (data && data.quizname && Array.isArray(data.items)) {
+							let importCount = 0;
+							for (const item of data.items) {
+								if (item.query && item.answer) {
+									await addQuizItem(data.quizname, item.query, item.answer);
+									importCount++;
+								}
 							}
+							Alert.alert('Erfolg', `Thema "${data.quizname}" mit ${importCount} Fragen wurde importiert.`);
+						} else if (Array.isArray(data)) {
+							let importCount = 0;
+							for (const item of data) {
+								if (item.quizname && item.query && item.answer) {
+									await addQuizItem(item.quizname, item.query, item.answer);
+									importCount++;
+								}
+							}
+							Alert.alert('Erfolg', `${importCount} Fragen wurden importiert.`);
+						} else {
+							throw new Error('Format ungültig');
 						}
-						Alert.alert('Erfolg', `${importCount} Fragen wurden importiert.`);
+
 						loadTopics();
 					} catch (ex) {
-						Alert.alert('Fehler', 'Ungültige Datei. Bitte wähle eine korrekte .json Datei aus.');
+						Alert.alert('Fehler', 'Ungültige Datei. Bitte überprüfe das Dateiformat.');
 					}
 				};
 				reader.readAsText(file);
