@@ -27,7 +27,7 @@ function shuffle(array) {
 }
 
 // Draggable Vocabulary Term
-function DraggableTerm({ term, index, onDragEnd, disabled }) {
+function DraggableTerm({ term, index, onDrag, onDragEnd, disabled }) {
 	const pan = useRef(new Animated.ValueXY()).current;
 	const scale = useRef(new Animated.Value(1)).current;
 	const zIndex = useRef(new Animated.Value(1)).current;
@@ -38,9 +38,12 @@ function DraggableTerm({ term, index, onDragEnd, disabled }) {
 			onMoveShouldSetPanResponder: () => !disabled,
 			onPanResponderGrant: () => {
 				zIndex.setValue(1000);
-				Animated.spring(scale, { toValue: 1.05, useNativeDriver: false }).start();
+				Animated.spring(scale, { toValue: 1.1, useNativeDriver: false }).start();
 			},
-			onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+			onPanResponderMove: (e, gesture) => {
+				Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false })(e, gesture);
+				onDrag(gesture.moveX, gesture.moveY);
+			},
 			onPanResponderRelease: (e, gesture) => {
 				// Calculate drop position
 				const dropX = gesture.moveX;
@@ -71,7 +74,7 @@ function DraggableTerm({ term, index, onDragEnd, disabled }) {
 			<View style={styles.vocabNumBadge}>
 				<Text style={styles.vocabNumText}>{index + 1}</Text>
 			</View>
-			<Text style={styles.vocabText}>{term}</Text>
+			<Text style={styles.vocabText} numberOfLines={1}>{term}</Text>
 		</Animated.View>
 	);
 }
@@ -87,33 +90,23 @@ export default function QuizScreen({ route }) {
 	const [score, setScore] = useState(null);
 	const [loading, setLoading] = useState(true);
 	const [dropZones, setDropZones] = useState({});
+	const [activeHoverZone, setActiveHoverZone] = useState(null);
 
 	const fadeAnim = useRef(new Animated.Value(0)).current;
+	const dropRefs = useRef({});
+
+	useEffect(() => { loadQuizNames(); }, []);
 
 	useEffect(() => {
-		loadQuizNames();
-	}, []);
-
-	useEffect(() => {
-		Animated.timing(fadeAnim, {
-			toValue: 1,
-			duration: 600,
-			useNativeDriver: true,
-		}).start();
+		Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
 	}, [selectedQuiz, submitted]);
 
 	const loadQuizNames = async () => {
 		try {
 			const names = await getQuizNames();
 			setQuizNames(names);
-			if (names.length > 0) {
-				selectQuiz(names[0]);
-			}
-		} catch (error) {
-			console.error('Error loading quiz names:', error);
-		} finally {
-			setLoading(false);
-		}
+			if (names.length > 0) selectQuiz(names[0]);
+		} catch (error) { console.error(error); } finally { setLoading(false); }
 	};
 
 	const selectQuiz = async (name) => {
@@ -128,55 +121,40 @@ export default function QuizScreen({ route }) {
 			setScore(null);
 			setDropZones({});
 			fadeAnim.setValue(0);
-		} catch (error) {
-			console.error('Error loading quiz:', error);
-		} finally {
-			setLoading(false);
-		}
+		} catch (error) { console.error(error); } finally { setLoading(false); }
 	};
 
-	const onLayoutDropZone = (idx, event) => {
-		const { x, y, width, height } = event.nativeEvent.layout;
-		// Since we are in a ScrollView, we need absolute coordinates
-		// We'll use measure to get them if needed, but for now let's use a simpler approach
-		// or measure the view when needed.
+	const updateDropZonesMeasurements = () => {
+		Object.keys(dropRefs.current).forEach((idx) => {
+			if (dropRefs.current[idx]) {
+				dropRefs.current[idx].measure((x, y, width, height, px, py) => {
+					setDropZones(prev => ({ ...prev, [idx]: { px, py, width, height } }));
+				});
+			}
+		});
 	};
 
-	const handleDragEnd = (termIdx, x, y) => {
-		// Collision detection
+	const checkCollision = (x, y) => {
 		let matchedIdx = -1;
-
-		// We need to measure all dropzones relative to screen
-		// This is tricky in a ScrollView. A better way in RN for DnD is to use a matching interaction.
-		// For now, let's try to find the row by layout.
-
-		// Optimization: Find which row the point {x, y} is in.
 		Object.keys(dropZones).forEach((idx) => {
 			const zone = dropZones[idx];
-			if (
-				x >= zone.px &&
-				x <= zone.px + zone.width &&
-				y >= zone.py &&
-				y <= zone.py + zone.height
-			) {
+			if (x >= zone.px && x <= zone.px + zone.width && y >= zone.py && y <= zone.py + zone.height) {
 				matchedIdx = parseInt(idx);
 			}
 		});
+		return matchedIdx;
+	};
 
+	const handleDrag = (x, y) => {
+		setActiveHoverZone(checkCollision(x, y));
+	};
+
+	const handleDragEnd = (termIdx, x, y) => {
+		const matchedIdx = checkCollision(x, y);
 		if (matchedIdx !== -1) {
 			setUserAnswers((prev) => ({ ...prev, [matchedIdx]: termIdx }));
 		}
-	};
-
-	const registerDropZone = (idx, ref) => {
-		if (ref) {
-			ref.measure((x, y, width, height, px, py) => {
-				setDropZones((prev) => ({
-					...prev,
-					[idx]: { px, py, width, height }
-				}));
-			});
-		}
+		setActiveHoverZone(null);
 	};
 
 	const handleSubmit = async () => {
@@ -206,16 +184,7 @@ export default function QuizScreen({ route }) {
 		setScore(correct);
 		setSubmitted(true);
 		fadeAnim.setValue(0);
-
-		try {
-			await saveQuizResult(username, selectedQuiz, correct, quizData.length, details);
-		} catch (error) {
-			console.error('Error saving quiz result:', error);
-		}
-	};
-
-	const handleRestart = () => {
-		selectQuiz(selectedQuiz);
+		try { await saveQuizResult(username, selectedQuiz, correct, quizData.length, details); } catch (e) { console.error(e); }
 	};
 
 	if (loading) return <LoadingView message="Quiz wird geladen..." />;
@@ -242,30 +211,12 @@ export default function QuizScreen({ route }) {
 			<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
 				<ScrollView contentContainerStyle={styles.resultContainer}>
 					<Animated.View style={{ opacity: fadeAnim, alignItems: 'center' }}>
-						<Text style={styles.resultEmoji}>
-							{isPerfect ? '🏆' : isGood ? '👏' : '💪'}
-						</Text>
-						<Text style={styles.resultTitle}>
-							{isPerfect ? 'Perfekt!' : isGood ? 'Gut gemacht!' : 'Weiter üben!'}
-						</Text>
-						<Text style={styles.resultSubtitle}>
-							{username}, du hast {score} von {quizData.length} richtig!
-						</Text>
+						<Text style={styles.resultEmoji}>{isPerfect ? '🏆' : isGood ? '👏' : '💪'}</Text>
+						<Text style={styles.resultTitle}>{isPerfect ? 'Perfekt!' : isGood ? 'Gut gemacht!' : 'Weiter üben!'}</Text>
+						<Text style={styles.resultSubtitle}>{username}, du hast {score} von {quizData.length} richtig!</Text>
 
-						<View style={[styles.scoreCircle, {
-							borderColor: isPerfect ? COLORS.success : isGood ? COLORS.accent : COLORS.error
-						}]}>
-							<Text style={[styles.scorePercentage, {
-								color: isPerfect ? COLORS.success : isGood ? COLORS.accent : COLORS.error
-							}]}>
-								{percentage}%
-							</Text>
-						</View>
-
-						<View style={styles.statsRow}>
-							<StatsCard icon="✅" value={score} label="Richtig" color={COLORS.success} />
-							<View style={{ width: SPACING.md }} />
-							<StatsCard icon="❌" value={quizData.length - score} label="Falsch" color={COLORS.error} />
+						<View style={[styles.scoreCircle, { borderColor: isPerfect ? COLORS.success : isGood ? COLORS.accent : COLORS.error }]}>
+							<Text style={[styles.scorePercentage, { color: isPerfect ? COLORS.success : isGood ? COLORS.accent : COLORS.error }]}>{percentage}%</Text>
 						</View>
 
 						<Card style={styles.detailCard}>
@@ -277,25 +228,12 @@ export default function QuizScreen({ route }) {
 
 								return (
 									<View key={idx} style={[styles.detailRow, { borderLeftColor: isCorrect ? COLORS.success : COLORS.error }]}>
-										<View style={styles.detailHeader}>
-											<Text style={styles.detailNumber}>#{idx + 1}</Text>
-											<Badge
-												text={isCorrect ? 'Richtig' : 'Falsch'}
-												variant={isCorrect ? 'success' : 'error'}
-											/>
-										</View>
 										<Text style={styles.detailAnswer}>{item.answer}</Text>
 										<View style={styles.detailTermRow}>
 											<Text style={styles.detailTermLabel}>Deine Wahl:</Text>
-											<Text style={[styles.detailTermValue, { color: isCorrect ? COLORS.success : COLORS.error }]}>
-												({userInputIdx + 1}) {quizData[userInputIdx]?.query}
-											</Text>
+											<Text style={[styles.detailTermValue, { color: isCorrect ? COLORS.success : COLORS.error }]}>({userInputIdx + 1}) {quizData[userInputIdx]?.query}</Text>
 										</View>
-										{!isCorrect && (
-											<Text style={styles.detailCorrection}>
-												Richtig wäre: ({correctIndex + 1}) {quizData[correctIndex].query}
-											</Text>
-										)}
+										{!isCorrect && <Text style={styles.detailCorrection}>Richtig wäre: ({correctIndex + 1}) {quizData[correctIndex].query}</Text>}
 									</View>
 								);
 							})}
@@ -304,15 +242,15 @@ export default function QuizScreen({ route }) {
 						<View style={styles.buttonRow}>
 							<GradientButton
 								title="🔄  Nochmal"
-								onPress={handleRestart}
+								onPress={() => selectQuiz(selectedQuiz)}
 								variant="primary"
-								style={{ flex: 1, marginRight: SPACING.sm }}
+								style={{ flex: 1 }}
 							/>
 							<GradientButton
 								title="📋  Anderes Quiz"
 								onPress={() => { setSelectedQuiz(null); setSubmitted(false); }}
 								variant="accent"
-								style={{ flex: 1, marginLeft: SPACING.sm }}
+								style={{ flex: 1 }}
 							/>
 						</View>
 					</Animated.View>
@@ -331,9 +269,7 @@ export default function QuizScreen({ route }) {
 						<Card key={name} onPress={() => selectQuiz(name)} style={styles.quizCard}>
 							<View style={styles.quizCardContent}>
 								<Text style={styles.quizCardEmoji}>📚</Text>
-								<View style={{ flex: 1, marginLeft: SPACING.lg }}>
-									<Text style={styles.quizCardTitle}>{name}</Text>
-								</View>
+								<Text style={[styles.quizCardTitle, { flex: 1, marginLeft: 16 }]}>{name}</Text>
 								<Text style={styles.quizCardArrow}>→</Text>
 							</View>
 						</Card>
@@ -346,7 +282,11 @@ export default function QuizScreen({ route }) {
 	// QUIZ PLAY VIEW
 	return (
 		<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
-			<ScrollView contentContainerStyle={styles.quizContainer}>
+			<ScrollView
+				contentContainerStyle={styles.quizContainer}
+				onScroll={updateDropZonesMeasurements}
+				scrollEventThrottle={16}
+			>
 				<Animated.View style={{ opacity: fadeAnim }}>
 					{/* Header */}
 					<View style={styles.quizHeader}>
@@ -355,50 +295,49 @@ export default function QuizScreen({ route }) {
 					</View>
 
 					<Text style={styles.quizTitle}>Zuordnungs-Quiz</Text>
-					<Text style={styles.quizInstruction}>
-						Ziehe die Begriffe von links auf die Fragezeichen im rechten Bereich.
-					</Text>
+					<Text style={styles.quizInstruction}>Ziehe die Begriffe von links auf die Zielfelder ganz rechts.</Text>
 
 					{/* Table Headers */}
 					<View style={styles.tableHeader}>
-						<Text style={[styles.thText, { width: 40 }]}>#</Text>
-						<Text style={[styles.thText, { flex: 1 }]}>Begriff (Ziehen)</Text>
-						<Text style={[styles.thText, { flex: 1.5, marginLeft: 20 }]}>Beschreibung</Text>
-						<Text style={[styles.thText, { width: 80, textAlign: 'center' }]}>Ziel (?)</Text>
+						<Text style={[styles.thText, { width: 30 }]}>#</Text>
+						<Text style={[styles.thText, { width: 100 }]}>Begriff</Text>
+						<Text style={[styles.thText, { flex: 1, marginLeft: 10 }]}>Beschreibung</Text>
+						<Text style={[styles.thText, { width: 100, textAlign: 'center' }]}>Ziel (?)</Text>
 					</View>
 
 					{/* Table Rows */}
 					{shuffledAnswers.map((item, idx) => (
 						<View key={idx} style={[styles.tableRow, idx % 2 === 0 && styles.tableRowAlt]}>
 							{/* Index */}
-							<View style={{ width: 40, alignItems: 'center' }}>
-								<Text style={styles.detailNumber}>#{idx + 1}</Text>
-							</View>
+							<Text style={[styles.detailNumber, { width: 30, textAlign: 'center' }]}>{idx + 1}</Text>
 
 							{/* Draggable Term Section (Left) */}
-							<View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-								{idx < quizData.length ? (
+							<View style={{ width: 100 }}>
+								{quizData[idx] && (
 									<DraggableTerm
 										term={quizData[idx].query}
 										index={idx}
+										onDrag={handleDrag}
 										onDragEnd={handleDragEnd}
 										disabled={submitted}
 									/>
-								) : <View style={{ flex: 1 }} />}
+								)}
 							</View>
 
 							{/* Description Section (Middle) */}
-							<View style={{ flex: 1.5, paddingHorizontal: SPACING.md }}>
+							<View style={{ flex: 1, paddingHorizontal: 12 }}>
 								<Text style={styles.descText}>{item.answer}</Text>
 							</View>
 
 							{/* Drop Zone Section (Right) */}
-							<View style={styles.colDrop}>
+							<View style={{ width: 100, alignItems: 'center', justifyContent: 'center' }}>
 								<View
-									ref={(ref) => registerDropZone(idx, ref)}
+									onLayout={updateDropZonesMeasurements}
+									ref={(ref) => { dropRefs.current[idx] = ref; }}
 									style={[
 										styles.dropZone,
-										userAnswers[idx] !== undefined && styles.dropZoneFilled
+										userAnswers[idx] !== undefined && styles.dropZoneFilled,
+										activeHoverZone === idx && styles.dropZoneHover
 									]}
 								>
 									<Text style={styles.dropZoneText}>
@@ -406,14 +345,7 @@ export default function QuizScreen({ route }) {
 									</Text>
 								</View>
 								{userAnswers[idx] !== undefined && (
-									<TouchableOpacity
-										onPress={() => {
-											const newAnswers = { ...userAnswers };
-											delete newAnswers[idx];
-											setUserAnswers(newAnswers);
-										}}
-										style={styles.clearBtn}
-									>
+									<TouchableOpacity onPress={() => { let n = { ...userAnswers }; delete n[idx]; setUserAnswers(n); }} style={styles.clearBtn}>
 										<Text style={styles.clearBtnText}>✕</Text>
 									</TouchableOpacity>
 								)}
@@ -436,69 +368,58 @@ export default function QuizScreen({ route }) {
 const styles = StyleSheet.create({
 	container: { flex: 1 },
 	// Select view
-	selectContainer: { padding: SPACING.xxl, paddingTop: SPACING.huge },
-	selectTitle: { fontSize: FONTS.sizes.xxxl, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary, marginBottom: SPACING.xxl },
-	quizCard: { marginBottom: SPACING.md },
+	selectContainer: { padding: 24, paddingTop: 40 },
+	selectTitle: { fontSize: 28, fontWeight: 'bold', color: COLORS.textPrimary, marginBottom: 24 },
+	quizCard: { marginBottom: 12 },
 	quizCardContent: { flexDirection: 'row', alignItems: 'center' },
-	quizCardEmoji: { fontSize: 32 },
-	quizCardTitle: { fontSize: FONTS.sizes.lg, fontWeight: FONTS.weights.semiBold, color: COLORS.textPrimary },
-	quizCardArrow: { fontSize: 24, color: COLORS.primary },
+	quizCardEmoji: { fontSize: 24 },
+	quizCardTitle: { fontSize: 18, fontWeight: '600', color: COLORS.textPrimary },
+	quizCardArrow: { fontSize: 20, color: COLORS.primary },
 
 	// Quiz view
-	quizContainer: { padding: SPACING.md, paddingBottom: SPACING.huge },
-	quizHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.lg },
+	quizContainer: { padding: 12, paddingBottom: 60 },
+	quizHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
 	quizHeaderUser: { color: COLORS.textSecondary, fontWeight: '500' },
-	quizTitle: { fontSize: 24, fontWeight: 'bold', color: COLORS.textPrimary, marginBottom: 4 },
-	quizInstruction: { color: COLORS.textMuted, fontSize: 13, marginBottom: 20 },
+	quizTitle: { fontSize: 22, fontWeight: 'bold', color: COLORS.textPrimary },
+	quizInstruction: { color: COLORS.textMuted, fontSize: 12, marginBottom: 16 },
 
 	// Table DnD
-	tableHeader: { flexDirection: 'row', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-	thText: { color: COLORS.primaryLight, fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' },
-	tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border + '30' },
-	tableRowAlt: { backgroundColor: COLORS.white + '05' },
+	tableHeader: { flexDirection: 'row', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+	thText: { color: COLORS.primaryLight, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
+	tableRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border + '20' },
+	tableRowAlt: { backgroundColor: 'rgba(255,255,255,0.03)' },
 
-	draggableVocab: {
-		flex: 1,
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: COLORS.surface,
-		padding: 8,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: COLORS.primary + '40',
-		...SHADOWS.sm
-	},
-	vocabNumBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
-	vocabNumText: { color: COLORS.white, fontSize: 11, fontWeight: 'bold' },
-	vocabText: { color: COLORS.textPrimary, fontSize: 13, fontWeight: '500' },
+	draggableVocab: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, padding: 6, borderRadius: 6, borderWidth: 1, borderColor: COLORS.primary + '30', ...SHADOWS.sm },
+	vocabNumBadge: { width: 18, height: 18, borderRadius: 9, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
+	vocabNumText: { color: COLORS.white, fontSize: 10, fontWeight: 'bold' },
+	vocabText: { color: COLORS.textPrimary, fontSize: 12, fontWeight: '500' },
 
-	descText: { color: COLORS.textSecondary, fontSize: 13, lineHeight: 18 },
+	descText: { color: COLORS.textSecondary, fontSize: 12, lineHeight: 16 },
 
-	colDrop: { width: 80, alignItems: 'center', flexDirection: 'row', justifyContent: 'flex-end' },
-	dropZone: { width: 44, height: 44, borderRadius: 8, borderWidth: 2, borderStyle: 'dashed', borderColor: COLORS.primary + '60', backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
-	dropZoneFilled: { borderStyle: 'solid', borderColor: COLORS.success, backgroundColor: COLORS.success + '15' },
-	dropZoneText: { color: COLORS.textPrimary, fontSize: 16, fontWeight: 'bold' },
-	clearBtn: { padding: 4, marginLeft: 4 },
-	clearBtnText: { color: COLORS.error, fontSize: 16 },
+	dropZone: { width: 56, height: 56, borderRadius: 10, borderWidth: 2, borderStyle: 'dashed', borderColor: COLORS.primary + '40', backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
+	dropZoneFilled: { borderStyle: 'solid', borderColor: COLORS.success, backgroundColor: COLORS.success + '10' },
+	dropZoneHover: { borderColor: COLORS.accent, backgroundColor: COLORS.accent + '20', transform: [{ scale: 1.1 }] },
+	dropZoneText: { color: COLORS.textPrimary, fontSize: 20, fontWeight: 'bold' },
+	clearBtn: { padding: 4, marginTop: 4 },
+	clearBtnText: { color: COLORS.error, fontSize: 14 },
 
-	submitButton: { marginTop: 30 },
+	submitButton: { marginTop: 24 },
 
 	// Result view
 	resultContainer: { padding: 24, alignItems: 'center' },
-	resultEmoji: { fontSize: 64, marginBottom: 16 },
-	resultTitle: { fontSize: 32, fontWeight: 'bold', color: COLORS.textPrimary },
-	resultSubtitle: { fontSize: 18, color: COLORS.textSecondary, marginBottom: 24 },
-	scoreCircle: { width: 100, height: 100, borderRadius: 50, borderWidth: 4, alignItems: 'center', justifyContent: 'center', marginBottom: 24, backgroundColor: COLORS.surface },
-	scorePercentage: { fontSize: 28, fontWeight: 'bold' },
+	resultEmoji: { fontSize: 56, marginBottom: 12 },
+	resultTitle: { fontSize: 28, fontWeight: 'bold', color: COLORS.textPrimary },
+	resultSubtitle: { fontSize: 16, color: COLORS.textSecondary, marginBottom: 20 },
+	scoreCircle: { width: 90, height: 90, borderRadius: 45, borderWidth: 3, alignItems: 'center', justifyContent: 'center', marginBottom: 20, backgroundColor: COLORS.surface },
+	scorePercentage: { fontSize: 24, fontWeight: 'bold' },
 	detailCard: { width: '100%' },
-	detailTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.textPrimary, marginBottom: 16 },
-	detailRow: { borderLeftWidth: 3, paddingLeft: 12, marginBottom: 16 },
-	detailHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-	detailNumber: { color: COLORS.textMuted, fontSize: 12 },
-	detailAnswer: { fontSize: 15, color: COLORS.textPrimary, fontWeight: '500', marginBottom: 4 },
+	detailTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.textPrimary, marginBottom: 12 },
+	detailRow: { borderLeftWidth: 3, paddingLeft: 10, marginBottom: 12 },
+	detailNumber: { color: COLORS.textMuted, fontSize: 11 },
+	detailAnswer: { fontSize: 14, color: COLORS.textPrimary, fontWeight: '500' },
 	detailTermRow: { flexDirection: 'row', marginTop: 2 },
-	detailTermLabel: { fontSize: 13, color: COLORS.textSecondary, marginRight: 6 },
-	detailTermValue: { fontSize: 13, fontWeight: 'bold' },
-	detailCorrection: { fontSize: 12, color: COLORS.error, marginTop: 4, fontStyle: 'italic' },
-	buttonRow: { flexDirection: 'row', width: '100%', marginTop: 24 },
+	detailTermLabel: { fontSize: 12, color: COLORS.textSecondary, marginRight: 4 },
+	detailTermValue: { fontSize: 12, fontWeight: 'bold' },
+	detailCorrection: { fontSize: 11, color: COLORS.error, marginTop: 2 },
+	buttonRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
 });
