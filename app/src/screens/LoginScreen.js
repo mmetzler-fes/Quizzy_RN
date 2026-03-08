@@ -138,20 +138,16 @@ export default function LoginScreen({ navigation }) {
 								disabled={!username.trim()}
 								style={styles.loginButton}
 							/>
-						</View>
-					</Animated.View>
 
-					{/* Footer */}
-					<Animated.View style={[styles.footer, { opacity: fadeAnim }]}>
-						<Text style={styles.footerText}>
-							📚 Quiz • 📝 Vokabeln • 📊 Lernen
-						</Text>
-						<TouchableOpacity
-							onPress={() => navigation.navigate('Admin')}
-							style={styles.adminLink}
-						>
-							<Text style={styles.adminLinkText}>🔐 Lehrer-Bereich</Text>
-						</TouchableOpacity>
+							<View style={styles.divider} />
+
+							<TouchableOpacity
+								onPress={() => navigation.navigate('Admin')}
+								style={styles.adminLink}
+							>
+								<Text style={styles.adminLinkText}>🔐 Zum Lehrer-Bereich</Text>
+							</TouchableOpacity>
+						</View>
 					</Animated.View>
 				</ScrollView>
 			</KeyboardAvoidingView>
@@ -244,17 +240,14 @@ const styles = StyleSheet.create({
 	loginButton: {
 		marginTop: SPACING.sm,
 	},
-	footer: {
-		marginTop: SPACING.xxxl,
-		alignItems: 'center',
-	},
-	footerText: {
-		fontSize: FONTS.sizes.sm,
-		color: COLORS.textMuted,
-		letterSpacing: 1,
+	divider: {
+		height: 1,
+		backgroundColor: COLORS.border,
+		marginVertical: SPACING.xl,
+		width: '100%',
 	},
 	adminLink: {
-		marginTop: SPACING.lg,
+		alignItems: 'center',
 		paddingVertical: SPACING.sm,
 		paddingHorizontal: SPACING.xl,
 		borderRadius: RADIUS.full,
@@ -265,6 +258,6 @@ const styles = StyleSheet.create({
 	adminLinkText: {
 		color: COLORS.error,
 		fontSize: FONTS.sizes.sm,
-		fontWeight: FONTS.weights.medium,
+		fontWeight: FONTS.weights.bold,
 	},
 });

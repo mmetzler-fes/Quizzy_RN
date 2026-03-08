@@ -67,57 +67,59 @@ function AdminLogin({ onLogin, onBack, fadeAnim }) {
 
 	return (
 		<LinearGradient colors={[COLORS.background, '#1a0a2e']} style={styles.container}>
-			<Animated.View style={[styles.loginContainer, { opacity: fadeAnim }]}>
-				<View style={styles.loginIconWrap}>
-					<LinearGradient colors={['#EF4444', '#DC2626']} style={styles.loginIcon}>
-						<Text style={styles.loginIconText}>🔐</Text>
-					</LinearGradient>
-				</View>
+			<ScrollView contentContainerStyle={styles.loginScrollContent}>
+				<Animated.View style={[styles.loginContainer, { opacity: fadeAnim }]}>
+					<View style={styles.loginIconWrap}>
+						<LinearGradient colors={['#EF4444', '#DC2626']} style={styles.loginIcon}>
+							<Text style={styles.loginIconText}>🔐</Text>
+						</LinearGradient>
+					</View>
 
-				<Text style={styles.loginTitle}>Lehrer-Bereich</Text>
-				<Text style={styles.loginSubtitle}>
-					Melde dich an, um Quizze zu verwalten und Ergebnisse zu sehen.
-				</Text>
+					<Text style={styles.loginTitle}>Lehrer-Bereich</Text>
+					<Text style={styles.loginSubtitle}>
+						Melde dich an, um Quizze zu verwalten und Ergebnisse zu sehen.
+					</Text>
 
-				<Card style={styles.loginCard}>
-					{loginError ? (
-						<View style={styles.errorBanner}>
-							<Text style={styles.errorText}>⚠️ {loginError}</Text>
-						</View>
-					) : null}
+					<Card style={styles.loginCard}>
+						{loginError ? (
+							<View style={styles.errorBanner}>
+								<Text style={styles.errorText}>⚠️ {loginError}</Text>
+							</View>
+						) : null}
 
-					<Text style={styles.inputLabel}>BENUTZERNAME</Text>
-					<TextInput
-						style={styles.input}
-						placeholder="admin"
-						placeholderTextColor={COLORS.textMuted}
-						value={username}
-						onChangeText={setUsername}
-						autoCapitalize="none"
-					/>
+						<Text style={styles.inputLabel}>BENUTZERNAME</Text>
+						<TextInput
+							style={styles.input}
+							placeholder="admin"
+							placeholderTextColor={COLORS.textMuted}
+							value={username}
+							onChangeText={setUsername}
+							autoCapitalize="none"
+						/>
 
-					<Text style={styles.inputLabel}>PASSWORT</Text>
-					<TextInput
-						style={styles.input}
-						placeholder="••••••••"
-						placeholderTextColor={COLORS.textMuted}
-						value={password}
-						onChangeText={setPassword}
-						secureTextEntry
-					/>
+						<Text style={styles.inputLabel}>PASSWORT</Text>
+						<TextInput
+							style={styles.input}
+							placeholder="••••••••"
+							placeholderTextColor={COLORS.textMuted}
+							value={password}
+							onChangeText={setPassword}
+							secureTextEntry
+						/>
 
-					<GradientButton
-						title={loading ? '⏳ Anmelden...' : '🔓 Anmelden'}
-						onPress={handleLogin}
-						variant="error"
-						style={{ marginTop: SPACING.md }}
-					/>
-				</Card>
+						<GradientButton
+							title={loading ? '⏳ Anmelden...' : '🔓 Anmelden'}
+							onPress={handleLogin}
+							variant="error"
+							style={{ marginTop: SPACING.md }}
+						/>
+					</Card>
 
-				<TouchableOpacity onPress={onBack} style={styles.backLink}>
-					<Text style={styles.backLinkText}>← Zurück zum Login</Text>
-				</TouchableOpacity>
-			</Animated.View>
+					<TouchableOpacity onPress={onBack} style={styles.backLink}>
+						<Text style={styles.backLinkText}>← Zurück zum Login</Text>
+					</TouchableOpacity>
+				</Animated.View>
+			</ScrollView>
 		</LinearGradient>
 	);
 }
@@ -778,7 +780,8 @@ const styles = StyleSheet.create({
 	container: { flex: 1 },
 
 	// === LOGIN ===
-	loginContainer: { flex: 1, justifyContent: 'center', padding: SPACING.xxl },
+	loginScrollContent: { flexGrow: 1, justifyContent: 'center' },
+	loginContainer: { flex: 1, padding: SPACING.xxl },
 	loginIconWrap: { alignItems: 'center', marginBottom: SPACING.xl },
 	loginIcon: { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', ...SHADOWS.lg },
 	loginIconText: { fontSize: 36 },
