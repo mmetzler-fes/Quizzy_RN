@@ -13,7 +13,7 @@ import { COLORS, FONTS, SPACING, RADIUS } from './src/styles/theme';
 import LoginScreen from './src/screens/LoginScreen';
 import QuizScreen from './src/screens/QuizScreen';
 import QuizManageScreen from './src/screens/QuizManageScreen';
-import VokabelScreen from './src/screens/VokabelScreen';
+
 import VokabelLearnScreen from './src/screens/VokabelLearnScreen';
 import AdminScreen from './src/screens/AdminScreen';
 
@@ -64,15 +64,7 @@ function MainTabs({ route }) {
           ),
         }}
       />
-      <Tab.Screen
-        name="Vokabeln"
-        component={VokabelScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="📖" label="Vokabeln" focused={focused} />
-          ),
-        }}
-      />
+
       <Tab.Screen
         name="VokabelLernen"
         component={VokabelLearnScreen}
