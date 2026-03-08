@@ -82,6 +82,21 @@ function MainTabs({ route }) {
           ),
         }}
       />
+      <Tab.Screen
+        name="Abmelden"
+        component={View}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('Login');
+          },
+        })}
+        options={{
+          tabBarIcon: ({ focused }) => (
+            <TabIcon emoji="🚪" label="Logout" focused={focused} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }

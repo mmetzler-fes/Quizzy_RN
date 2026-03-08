@@ -9,6 +9,7 @@ import {
 	TextInput,
 	Animated,
 	Modal,
+	Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
@@ -361,6 +362,58 @@ function QuizManagementTab() {
 		);
 	};
 
+	// --- EXPORT / IMPORT ---
+	const handleExportTopic = async (name) => {
+		try {
+			const items = await getQuizByName(name);
+			const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(items, null, 2));
+			if (Platform.OS === 'web') {
+				const a = document.createElement('a');
+				a.href = dataStr;
+				a.download = `quiz_${name}.json`;
+				a.click();
+			} else {
+				Alert.alert('Info', 'Export ist derzeit nur im Web/Desktop verfügbar.');
+			}
+		} catch (error) {
+			Alert.alert('Fehler', 'Konnte nicht exportiert werden.');
+		}
+	};
+
+	const handleImportTopic = () => {
+		if (Platform.OS === 'web') {
+			const input = document.createElement('input');
+			input.type = 'file';
+			input.accept = 'application/json';
+			input.onchange = e => {
+				const file = e.target.files[0];
+				if (!file) return;
+				const reader = new FileReader();
+				reader.onload = async (event) => {
+					try {
+						const data = JSON.parse(event.target.result);
+						if (!Array.isArray(data)) throw new Error('Format ungültig');
+						let importCount = 0;
+						for (const item of data) {
+							if (item.quizname && item.query && item.answer) {
+								await addQuizItem(item.quizname, item.query, item.answer);
+								importCount++;
+							}
+						}
+						Alert.alert('Erfolg', `${importCount} Fragen wurden importiert.`);
+						loadTopics();
+					} catch (ex) {
+						Alert.alert('Fehler', 'Ungültige Datei. Bitte wähle eine korrekte .json Datei aus.');
+					}
+				};
+				reader.readAsText(file);
+			};
+			input.click();
+		} else {
+			Alert.alert('Info', 'Import ist derzeit nur im Web/Desktop verfügbar.');
+		}
+	};
+
 	// --- QUESTION ACTIONS ---
 	const handleAddQuestion = async () => {
 		if (!newQuery.trim() || !newAnswer.trim()) {
@@ -443,14 +496,20 @@ function QuizManagementTab() {
 							onPress={() => { setShowAddQuestion(!showAddQuestion); setEditingItem(null); }}
 						>
 							<Text style={[styles.topicActionBtnText, { color: COLORS.success }]}>
-								{showAddQuestion ? '✕ Abbrechen' : '+ Frage hinzufügen'}
+								{showAddQuestion ? '✕ Abbrechen' : '+ Frage'}
 							</Text>
 						</TouchableOpacity>
 						<TouchableOpacity
-							style={[styles.topicActionBtn, { backgroundColor: COLORS.error + '15', borderColor: COLORS.error + '40' }]}
+							style={[styles.topicActionBtn, { backgroundColor: COLORS.primaryLight + '15', borderColor: COLORS.primary + '40', marginLeft: 8 }]}
+							onPress={() => handleExportTopic(selectedTopic)}
+						>
+							<Text style={[styles.topicActionBtnText, { color: COLORS.primaryLight }]}>📤 Export</Text>
+						</TouchableOpacity>
+						<TouchableOpacity
+							style={[styles.topicActionBtn, { backgroundColor: COLORS.error + '15', borderColor: COLORS.error + '40', marginLeft: 8 }]}
 							onPress={() => handleDeleteTopic(selectedTopic)}
 						>
-							<Text style={[styles.topicActionBtnText, { color: COLORS.error }]}>🗑️ Thema löschen</Text>
+							<Text style={[styles.topicActionBtnText, { color: COLORS.error }]}>🗑️ Löschen</Text>
 						</TouchableOpacity>
 					</View>
 				</View>
@@ -571,20 +630,37 @@ function QuizManagementTab() {
 	// ---- TOPICS OVERVIEW ----
 	return (
 		<>
-			{/* New topic button */}
-			<TouchableOpacity
-				style={styles.newTopicToggle}
-				onPress={() => setShowNewTopic(!showNewTopic)}
-			>
-				<LinearGradient
-					colors={showNewTopic ? [COLORS.error, '#F87171'] : [COLORS.success, '#34D399']}
-					style={styles.newTopicToggleInner}
+			<View style={{ flexDirection: 'row', gap: SPACING.md }}>
+				{/* New topic button */}
+				<TouchableOpacity
+					style={[styles.newTopicToggle, { flex: 1 }]}
+					onPress={() => setShowNewTopic(!showNewTopic)}
 				>
-					<Text style={styles.newTopicToggleText}>
-						{showNewTopic ? '✕ Abbrechen' : '+ Neues Thema erstellen'}
-					</Text>
-				</LinearGradient>
-			</TouchableOpacity>
+					<LinearGradient
+						colors={showNewTopic ? [COLORS.error, '#F87171'] : [COLORS.success, '#34D399']}
+						style={styles.newTopicToggleInner}
+					>
+						<Text style={styles.newTopicToggleText}>
+							{showNewTopic ? '✕ Abbrechen' : '+ Neues Thema'}
+						</Text>
+					</LinearGradient>
+				</TouchableOpacity>
+
+				{/* Import topic button */}
+				<TouchableOpacity
+					style={[styles.newTopicToggle, { flex: 1 }]}
+					onPress={handleImportTopic}
+				>
+					<LinearGradient
+						colors={[COLORS.primary, '#8B5CF6']}
+						style={styles.newTopicToggleInner}
+					>
+						<Text style={styles.newTopicToggleText}>
+							📥 JSON Import
+						</Text>
+					</LinearGradient>
+				</TouchableOpacity>
+			</View>
 
 			{/* New topic form */}
 			{showNewTopic && (
