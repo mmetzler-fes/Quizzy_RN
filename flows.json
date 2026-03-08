@@ -1,0 +1,1452 @@
+[
+    {
+        "id": "012e717f75994bd8",
+        "type": "tab",
+        "label": "Quizzy",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "01dedf1916e5e8f8",
+        "type": "inject",
+        "z": "012e717f75994bd8",
+        "name": "CREATE quizzy",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "CREATE TABLE quizzy (quizid, query, answer)",
+        "payload": "",
+        "payloadType": "date",
+        "x": 300,
+        "y": 180,
+        "wires": [
+            [
+                "369b2b7e4c6745ad"
+            ]
+        ]
+    },
+    {
+        "id": "36c07d68e96a7003",
+        "type": "comment",
+        "z": "012e717f75994bd8",
+        "name": "CREATE tables",
+        "info": "",
+        "x": 100,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "3865530c6ce5f239",
+        "type": "comment",
+        "z": "012e717f75994bd8",
+        "name": "DROP tables",
+        "info": "",
+        "x": 90,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "d4ff8c9bf890be85",
+        "type": "inject",
+        "z": "012e717f75994bd8",
+        "name": "DROP quizzy",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "DROP TABLE quizzy",
+        "payload": "",
+        "payloadType": "date",
+        "x": 290,
+        "y": 300,
+        "wires": [
+            [
+                "369b2b7e4c6745ad"
+            ]
+        ]
+    },
+    {
+        "id": "16cd0588f3e96272",
+        "type": "function",
+        "z": "012e717f75994bd8",
+        "name": "INSERT quizzy",
+        "func": "var liste = [[\"Beziehung\", \"ist eine Verbindung zwischen zwei oder mehr Entitäten. Beispielsweise könnte es eine ... zwischen den Entitäten Person und Unternehmen geben, wenn eine Person dort beschäftigt ist.\"],\n[\"Normalisierung\", \"der Prozess wird bei der Konzeption von Datenbanken verwendet, um Redundanzen und Inkonsistenzen in der Datenstruktur zu vermeiden.\"],\n[\"Tupel (Datensatz)\", \"repräsentiert alle Merkmalswerte einer Entität einer Entitätsmenge. \"],\n[\"Foreign Key\", \"ist ein Attribut oder eine Kombination von Attributen das/die in einer Entity gespeichert wird und auf den Primary Key einer anderen Entity verweist.\"],\n[\"Relationale Datenbank\", \"ist eine Art von Datenbank bei der die Daten in Form von Tabellen (sogenannten Relationen) gespeichert werden und miteinander verknüpft werden können.\"],\n[\"DBMS\", \"Datenbank Management System\"],\n[\"Attribut\", \"ist ein Merkmal oder eine Eigenschaft einer Entity. Zum Beispiel könnten dies der Name und das Geschlecht einer Entity Person sein.\"],\n[\"NoSQL-Datenbank\", \"sind eine Klasse von Datenbanken die nicht das Relationenmodell verwenden, sondern alternative Ansätze zur Speicherung und Verarbeitung von Daten anbieten.\"],\n[\"Relation\", \"besteht aus einer Entitätsbezeichnung deren Attributen und Tupeln.\"],\n[\"Entity (Entität)\", \"ist eine abstrakte Repräsentation eines realen Objekts oder Konzepts z.B. eine Person oder ein Unternehmen oder ein Produkt.\"],\n[\"Denormalisierung\", \"bezieht sich auf den Prozess, bei dem mehrere Tabellen zu einer zusammengeführt werden, um die Performance von Abfragen zu verbessern.\"],\n[\"Primary Key\", \"ist ein Attribut oder eine Kombination von Attributen, das jeder Entität in einer Datenbank eindeutig zugeordnet ist. Er dient dazu die Entität eindeutig zu identifizieren.\"]];\nvar quizname = msg.quizname;\nvar message1 = \"INSERT INTO quizzy VALUES(\";\nfor (var i = 0; i < liste.length; i++) {\n    var message2 = \"(select rowid from quizzylist where quizname like '\" + quizname + \"'),\";\n    message2 += \"'\" + liste[i][0] + \"'\" + \", '\" + liste[i][1] + \"'\";\n    if (i < liste.length - 1) {\n        message2 += \"), (\";\n    }\n    message1 += message2;\n}\nmsg.payload = message1 + \");\";\nmsg.topic = msg.payload;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 720,
+        "y": 500,
+        "wires": [
+            [
+                "af21fc227a455624"
+            ]
+        ]
+    },
+    {
+        "id": "36f8ee1e84e63c73",
+        "type": "http in",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "url": "/quizzy/learn",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 120,
+        "y": 1100,
+        "wires": [
+            [
+                "3478e58186fa29de"
+            ]
+        ]
+    },
+    {
+        "id": "72154639695b4f13",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "HTML Body",
+        "field": "template.body",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "<div class=\"container\">\n  <h1> Quizzy </h1>\n  <form action=\"eval\" method=\"post\">\n  <div class=\"row\">\n    <div class=\"column-md-6\"> \n      <table class=\"table table-hover\">\n        <thead>\n          <tr>\n             <th scope=\"col\">Ordne die Begriffe der Nummer der Beschreibung zu</th>\n            <th scope=\"col\">Begriffe</th>\n            <th scope=\"col\">Nummer</th>\n            <th scope=\"col\">Beschreibung</th>\n          </tr>\n        </thead>\n        <tbody>\n          {{#payload}}\n          <tr class=\"table-active\">\n            <input name=\"{{rowId}}\" type=\"hidden\" value=\"{{rowid}}\">\n            <td><input name=\"{{randomRowId}}\" autocomplete=\"off\" type=\"number\" placeholder=\"  \" ></input></td>\n            <td>{{query}}</td>\n            <td name=\"origRowid\">{{origRowId}}</td>          \n            <td>{{randomAnswer}}</td>\n           \n          </tr>\n          {{/payload}}\n        </tbody>\n      </table>\n\n    </div>  \n  </div>  \n  <input type=\"hidden\" name=\"username\" value=\"{{username}}\"> </input>\n  <input type=\"hidden\" name=\"quizname\" value=\"{{quizname}}\"> </input>\n  <input type=\"hidden\" name=\"date\" value=\"{{date}}\"> </input>\n  <input type=\"hidden\" name=\"totalnumber\" value=\"{{totalnumber}}\"> </input>\n\n  <button type=\"submit\">Absenden</button>  \n  </form>\n</div>\n",
+        "output": "str",
+        "x": 830,
+        "y": 1100,
+        "wires": [
+            [
+                "d981f1be45ecc689"
+            ]
+        ]
+    },
+    {
+        "id": "d2094720bdba868a",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "HTTP Navbar",
+        "field": "template.navbar",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "  <nav class=\"navbar navbar-expand-lg navbar-dark bg-primary mb-4\">\n    <div class=\"container-fluid\">\n      <a class=\"navbar-brand\" href=\"/quizzy/Statistik\">Quizzy Statistik</a>\n      <button class=\"navbar-toggler\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#navbarColor01\" aria-controls=\"navbarColor01\" aria-expanded=\"false\" aria-label=\"Toggle navigation\">\n        <span class=\"navbar-toggler-icon\"></span>\n      </button>\n      <div class=\"collapse navbar-collapse\" id=\"navbarColor01\">\n        <ul class=\"navbar-nav me-auto\">\n          <li class=\"nav-item\">\n            <a class=\"nav-link\" href=\"/quizzy\">Quizzy Abfrage</a>\n          </li>\n          <li class=\"nav-item\">\n            <a class=\"nav-link\" href=\"/quizzy/loesung1\">Quizzy Lösung</a>\n          </li>\n        </ul>\n        <form method=\"POST\" action=\"/quizzy/Statistik\" class=\"d-flex\">\n          <input name=\"search\" value=\"{{req.body.search}}\" class=\"form-control me-sm-2\" type=\"text\" placeholder=\"Search\">\n          <button class=\"btn btn-secondary my-2 my-sm-0\" type=\"submit\">Search</button>\n        </form>\n      </div>\n    </div>\n  </nav>\n",
+        "output": "str",
+        "x": 1020,
+        "y": 1040,
+        "wires": [
+            [
+                "d981f1be45ecc689"
+            ]
+        ]
+    },
+    {
+        "id": "d981f1be45ecc689",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "HTML Head",
+        "field": "template.head",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "\n<head>\n  \n<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js\"></script>\n<script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js\" integrity=\"sha384-A3rJD856KowSb7dwlZdYEkO39Gagi7vIsF0jrRAoQmDKKtQBHUuLZ9AsSv4jD4Xa\" crossorigin=\"anonymous\"></script>\n<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/bootswatch@4.5.2/dist/litera/bootstrap.min.css\" integrity=\"sha384-enpDwFISL6M3ZGZ50Tjo8m65q06uLVnyvkFO3rsoW0UC15ATBFz3QEhr3hmxpYsn\" crossorigin=\"anonymous\">\n<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css\">\n \n <style> \n button {\n  margin-top: 20px;\n  margin-bottom: 10px;\n  margin-right: 10px;\n  margin-left: 20px;\n}\ndiv {\n  padding-top: 10px;\n  padding-right: 10px;\n  padding-bottom: 10px;\n  padding-left: 10px;\n}\n </style>\n</head> \n",
+        "output": "str",
+        "x": 1090,
+        "y": 1180,
+        "wires": [
+            [
+                "8fd4bafa6114abf5"
+            ]
+        ]
+    },
+    {
+        "id": "8fd4bafa6114abf5",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "HTML",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "<html>\n{{{template.head}}}\n<body>\n<div class=\"container\">\n  {{{template.navbar}}}\n  {{{template.body}}}\n</div>\n</body>\n</html>",
+        "output": "str",
+        "x": 1250,
+        "y": 1180,
+        "wires": [
+            [
+                "091521fdb44af28b"
+            ]
+        ]
+    },
+    {
+        "id": "091521fdb44af28b",
+        "type": "http response",
+        "z": "012e717f75994bd8",
+        "name": "http response",
+        "statusCode": "",
+        "headers": {},
+        "x": 1420,
+        "y": 1180,
+        "wires": []
+    },
+    {
+        "id": "1109f3a1c73be2cc",
+        "type": "function",
+        "z": "012e717f75994bd8",
+        "name": "Payload erweitern",
+        "func": "function shuffle(myArray) {\n    var arrayLength = myArray.length;\n    if (arrayLength == 0) return false; // false wenn das Array leer ist\n    for (var i = 0; i < arrayLength; i++) {\n        //zufaellige Nummer aus dem Array auswaehlen\n        var j = Math.floor(Math.random() * (arrayLength - 1));\n        //aktuelle Arraynummer mit dem zufaellig generierten austauschen (swap)\n        var tempi = myArray[i];\n        var tempj = myArray[j];\n        myArray[i] = tempj;\n        myArray[j] = tempi;\n    }\n    return myArray;\n}\nvar myMessage = msg;\n\n//myMessage.topic=\"quizzy\";\n//myMessage.payload=msg.payload;\nvar sortedArray=new Array(msg.payload.length);\nfor (var i = 0; i < msg.payload.length; i++) {\n    sortedArray[i]=i+1;\n    myMessage.payload[i].origRowId = i+1;\n}\nvar myRandomArray=shuffle(sortedArray);\n\nfor (var i=0; i < msg.payload.length; i++) {\n   \n   myMessage.payload[i].rowid = msg.payload[i].rowid;\n   myMessage.payload[i].randomRowId = myRandomArray[i];\n   myMessage.payload[myRandomArray[i]-1].randomAnswer=msg.payload[i].answer;\n}\nmyMessage.username = msg.req.query.username;\nmyMessage.quizname = msg.req.query.quizname;\nmyMessage.date = new Date();\nmyMessage.totalnumber = msg.payload.length;\nreturn myMessage;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 650,
+        "y": 1100,
+        "wires": [
+            [
+                "72154639695b4f13"
+            ]
+        ]
+    },
+    {
+        "id": "56e95eb19a9d490d",
+        "type": "http in",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "url": "/quizzy/eval",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 130,
+        "y": 1180,
+        "wires": [
+            [
+                "ed3fd2b77b1835b7"
+            ]
+        ]
+    },
+    {
+        "id": "af761bec7a643517",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "HTML Body",
+        "field": "template.body",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "<div class=\"container\">\n  <h1> Quizzy Eval</h1>\n  <h2> Es waren {{korrekt}} Felder korrekt ausgefüllt. </h2>\n  <h2> Das sind {{rating}} Prozent. </h2>\n  <form action=\"learn\" method=\"get\">\n    <input type=\"hidden\" name=\"username\" value=\"{{username}}\"> </input>\n    <input type=\"hidden\" name=\"quizname\" value=\"{{quizname}}\"> </input>\n    <input type=\"hidden\" name=\"date\" value=\"{{date}}\"> </input>\n   <button type=\"submit\"> Nochmal versuchen? </button>\n\n  </form>\n</div>",
+        "output": "str",
+        "x": 910,
+        "y": 1180,
+        "wires": [
+            [
+                "d981f1be45ecc689"
+            ]
+        ]
+    },
+    {
+        "id": "ed3fd2b77b1835b7",
+        "type": "function",
+        "z": "012e717f75994bd8",
+        "name": "Eval",
+        "func": "var korrekt=0;\nvar i=0;\nfor (let row in msg.payload) {\n   var number=parseInt(msg.payload[row]);\n   if (number == parseInt(row)) korrekt++;\n   i++;\n}\nmsg.payload.korrekt=korrekt;\nvar totalnumber = parseFloat(msg.payload.totalnumber);\nmsg.payload.rating = Math.round(korrekt * 100 / totalnumber);\nmsg.korrekt=korrekt;\nmsg.rating = Math.round(korrekt * 100 / totalnumber);\nmsg.username = msg.payload.username;\nmsg.quizname = msg.payload.quizname;\nmsg.date = new Date();\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 310,
+        "y": 1180,
+        "wires": [
+            [
+                "2e50f12de5c09f01"
+            ]
+        ]
+    },
+    {
+        "id": "9268d6ce604312c9",
+        "type": "http in",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "url": "/quizzy/loesung2",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 1040,
+        "wires": [
+            [
+                "fa42f62f6f0181d0"
+            ]
+        ]
+    },
+    {
+        "id": "d426f562ba66914e",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "HTML Body",
+        "field": "template.body",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "<div class=\"container\">\n  <h1> Quizzy </h1>\n  <form action=\"eval\" method=\"post\">\n  <div class=\"row\">\n    <div class=\"column-md-6\"> \n      <table class=\"table table-hover\">\n        <thead>\n          <tr>\n             <th scope=\"col\">Ordne die Begriffe der Nummer der Beschreibung zu</th>\n            <th scope=\"col\">Begriffe</th>\n            <th scope=\"col\">Nummer</th>\n            <th scope=\"col\">Beschreibung</th>\n          </tr>\n        </thead>\n        <tbody>\n          {{#payload}}\n          <tr class=\"table-active\">\n            <input name=\"{{rowId}}\" type=\"hidden\" value=\"{{rowid}}\">\n            <td><input name=\"{{randomRowId}}\" \"type=\"number\" placeholder=\"{{randomRowId}}\"></input></td>\n            <td>{{query}}</td>\n            <td name=\"origRowid\">{{origRowId}}</td>     \n                  \n            <td>{{randomAnswer}}</td>\n           \n          </tr>\n          {{/payload}}\n        </tbody>\n      </table>\n\n    </div>  \n  </div>  \n  <button type=\"submit\">Absenden</button>  \n  </form>\n</div>\n",
+        "output": "str",
+        "x": 790,
+        "y": 1040,
+        "wires": [
+            [
+                "d2094720bdba868a"
+            ]
+        ]
+    },
+    {
+        "id": "763a33cb6a0bac0d",
+        "type": "comment",
+        "z": "012e717f75994bd8",
+        "name": "Quizzy Statistik",
+        "info": "show: anzeigen der Fragen mit Musterlösungen\nlearn: ohne Lösungen (ohne Menüleiste) für tests",
+        "x": 120,
+        "y": 800,
+        "wires": []
+    },
+    {
+        "id": "1a75d69cec737f67",
+        "type": "inject",
+        "z": "012e717f75994bd8",
+        "name": "CREATE quizzy_statistik",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "CREATE TABLE quizzy_statistik (quizname varchar, username varchar, date date, rating float)",
+        "payload": "",
+        "payloadType": "date",
+        "x": 330,
+        "y": 220,
+        "wires": [
+            [
+                "369b2b7e4c6745ad"
+            ]
+        ]
+    },
+    {
+        "id": "a7d7e1633e95a9f4",
+        "type": "inject",
+        "z": "012e717f75994bd8",
+        "name": "DROP quizzy_statistik",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "DROP TABLE quizzy_statistik",
+        "payload": "",
+        "payloadType": "date",
+        "x": 320,
+        "y": 340,
+        "wires": [
+            [
+                "369b2b7e4c6745ad"
+            ]
+        ]
+    },
+    {
+        "id": "a319c79674910b16",
+        "type": "comment",
+        "z": "012e717f75994bd8",
+        "name": "Import Quiz-Example in Database",
+        "info": "",
+        "x": 150,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "7f97a0b959b1a0d3",
+        "type": "comment",
+        "z": "012e717f75994bd8",
+        "name": "Quizzy Start",
+        "info": "User gives his username.\nThis will be used for quiz statistik.",
+        "x": 110,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "b5e50a21cff13e8a",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "HTML Head",
+        "field": "template.head",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "\n<head>\n  \n<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js\"></script>\n<script src=\"https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js\" integrity=\"sha384-A3rJD856KowSb7dwlZdYEkO39Gagi7vIsF0jrRAoQmDKKtQBHUuLZ9AsSv4jD4Xa\" crossorigin=\"anonymous\"></script>\n<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/bootswatch@4.5.2/dist/litera/bootstrap.min.css\" integrity=\"sha384-enpDwFISL6M3ZGZ50Tjo8m65q06uLVnyvkFO3rsoW0UC15ATBFz3QEhr3hmxpYsn\" crossorigin=\"anonymous\">\n<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css\">\n \n <style> \n button {\n  margin-top: 20px;\n  margin-bottom: 10px;\n  margin-right: 10px;\n  margin-left: 20px;\n}\ndiv {\n  padding-top: 10px;\n  padding-right: 10px;\n  padding-bottom: 10px;\n  padding-left: 10px;\n}\n </style>\n</head> \n",
+        "output": "str",
+        "x": 1230,
+        "y": 720,
+        "wires": [
+            [
+                "41bf8d854d1cd725"
+            ]
+        ]
+    },
+    {
+        "id": "41bf8d854d1cd725",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "HTML",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "<html>\n{{{template.head}}}\n<body>\n<div class=\"container\">\n\n  {{{template.body}}}\n</div>\n</body>\n</html>",
+        "output": "str",
+        "x": 1370,
+        "y": 720,
+        "wires": [
+            [
+                "148a21b6f3fd282f"
+            ]
+        ]
+    },
+    {
+        "id": "148a21b6f3fd282f",
+        "type": "http response",
+        "z": "012e717f75994bd8",
+        "name": "http response",
+        "statusCode": "",
+        "headers": {},
+        "x": 1520,
+        "y": 720,
+        "wires": []
+    },
+    {
+        "id": "2e50f12de5c09f01",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "INSERT",
+        "field": "topic",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "INSERT INTO quizzy_statistik VALUES('{{payload.quizname}}','{{payload.username}}','{{{payload.date}}}','{{{payload.rating}}}')",
+        "output": "str",
+        "x": 460,
+        "y": 1180,
+        "wires": [
+            [
+                "c2d7197ab7902ea4"
+            ]
+        ]
+    },
+    {
+        "id": "c35dcf73ff3a4aa5",
+        "type": "http in",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "url": "/quizzy/Statistik",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 130,
+        "y": 980,
+        "wires": [
+            [
+                "edab5d1421916831"
+            ]
+        ]
+    },
+    {
+        "id": "b02dfa0c5ff4772a",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "HTML Body",
+        "field": "template.body",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "<div class=\"container\">\n  <h1> Quizzy </h1>\n  <div class=\"row\">\n    <div class=\"column-md-6\"> \n      <table class=\"table table-hover\">\n        <thead>\n          <tr>\n            <th scope=\"col\">Date</th>\n            <th scope=\"col\">Username</th>\n            <th scope=\"col\">Rating</th>\n          </tr>\n        </thead>\n        <tbody>\n          {{#payload}}\n          <tr class=\"table-active\">\n            <td>{{date}}</td>\n            <td>{{username}}</td>\n            <td>{{rating}}</td>\n          </tr>\n          {{/payload}}\n        </tbody>\n      </table>\n\n    </div>  \n  </div>  \n\n</div>\n",
+        "output": "str",
+        "x": 670,
+        "y": 920,
+        "wires": [
+            [
+                "d2094720bdba868a"
+            ]
+        ]
+    },
+    {
+        "id": "edab5d1421916831",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "field": "topic",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "SELECT rowid, * FROM quizzy_statistik \nWHERE username LIKE '%{{payload.search}}%' \nORDER BY rating DESC",
+        "output": "str",
+        "x": 380,
+        "y": 920,
+        "wires": [
+            [
+                "191a34e8983a2279"
+            ]
+        ]
+    },
+    {
+        "id": "6a35acbf5b2eddce",
+        "type": "http in",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "url": "/quizzy/Statistik",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 920,
+        "wires": [
+            [
+                "edab5d1421916831"
+            ]
+        ]
+    },
+    {
+        "id": "d294e729251f2706",
+        "type": "comment",
+        "z": "012e717f75994bd8",
+        "name": "Quizzy V1.5",
+        "info": "",
+        "x": 90,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "421028e732e057b0",
+        "type": "change",
+        "z": "012e717f75994bd8",
+        "name": "Eval Values",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload.korrekt",
+                "pt": "msg",
+                "to": "korrekt",
+                "tot": "msg"
+            },
+            {
+                "t": "set",
+                "p": "payload.rating",
+                "pt": "msg",
+                "to": "rating",
+                "tot": "msg"
+            },
+            {
+                "t": "set",
+                "p": "payload.username",
+                "pt": "msg",
+                "to": "msg.username",
+                "tot": "str"
+            },
+            {
+                "t": "set",
+                "p": "payload.quizname",
+                "pt": "msg",
+                "to": "msg.quizname",
+                "tot": "str"
+            },
+            {
+                "t": "set",
+                "p": "payload.date",
+                "pt": "msg",
+                "to": "msg.date",
+                "tot": "str"
+            },
+            {
+                "t": "set",
+                "p": "payload.totalnumber",
+                "pt": "msg",
+                "to": "msg.totalnumber",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 750,
+        "y": 1180,
+        "wires": [
+            [
+                "af761bec7a643517"
+            ]
+        ]
+    },
+    {
+        "id": "3f10f2fdda2f4b4f",
+        "type": "inject",
+        "z": "012e717f75994bd8",
+        "name": "CREATE quizzylist",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "CREATE TABLE quizzylist (quizname varchar);",
+        "payload": "",
+        "payloadType": "date",
+        "x": 310,
+        "y": 140,
+        "wires": [
+            [
+                "369b2b7e4c6745ad"
+            ]
+        ]
+    },
+    {
+        "id": "ef474ee76644a0bf",
+        "type": "inject",
+        "z": "012e717f75994bd8",
+        "name": "Import DB Quiz",
+        "props": [
+            {
+                "p": "payload.quizname",
+                "v": "DB Grundbegriffe",
+                "vt": "str"
+            },
+            {
+                "p": "quizname",
+                "v": "DB Grundbegriffe",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 220,
+        "y": 500,
+        "wires": [
+            [
+                "ac8dff981f651ec9"
+            ]
+        ]
+    },
+    {
+        "id": "ac8dff981f651ec9",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "INSERT quizzylist",
+        "field": "topic",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "INSERT INTO quizzylist VALUES('{{payload.quizname}}')",
+        "output": "str",
+        "x": 410,
+        "y": 500,
+        "wires": [
+            [
+                "346dfff4aabc134b"
+            ]
+        ]
+    },
+    {
+        "id": "2626006ca53c386c",
+        "type": "inject",
+        "z": "012e717f75994bd8",
+        "name": "DROP quizzylist",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "DROP TABLE quizzylist;",
+        "payload": "",
+        "payloadType": "date",
+        "x": 300,
+        "y": 260,
+        "wires": [
+            [
+                "369b2b7e4c6745ad"
+            ]
+        ]
+    },
+    {
+        "id": "9a83e46ccca9057c",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "SELECT quizzylist",
+        "field": "topic",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "SELECT quizname from quizzylist;",
+        "output": "str",
+        "x": 810,
+        "y": 340,
+        "wires": [
+            [
+                "a1d24a085699d00b"
+            ]
+        ]
+    },
+    {
+        "id": "7a3665552576a6a2",
+        "type": "inject",
+        "z": "012e717f75994bd8",
+        "name": "Show quizzylist",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 620,
+        "y": 340,
+        "wires": [
+            [
+                "9a83e46ccca9057c"
+            ]
+        ]
+    },
+    {
+        "id": "773d3b8120704cf7",
+        "type": "debug",
+        "z": "012e717f75994bd8",
+        "name": "debug 116",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1150,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "2b0582b519d990ec",
+        "type": "debug",
+        "z": "012e717f75994bd8",
+        "name": "debug 117",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 810,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "65f69f47c26477cb",
+        "type": "inject",
+        "z": "012e717f75994bd8",
+        "name": "Import HTML Quiz",
+        "props": [
+            {
+                "p": "payload.quizname",
+                "v": "HTML Tags",
+                "vt": "str"
+            },
+            {
+                "p": "quizname",
+                "v": "HTML Tags",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "x": 230,
+        "y": 560,
+        "wires": [
+            [
+                "3717dadd6f393ff0"
+            ]
+        ]
+    },
+    {
+        "id": "3717dadd6f393ff0",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "INSERT quizzylist",
+        "field": "topic",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "INSERT INTO quizzylist VALUES('{{payload.quizname}}')",
+        "output": "str",
+        "x": 430,
+        "y": 560,
+        "wires": [
+            [
+                "c219d0b610223427"
+            ]
+        ]
+    },
+    {
+        "id": "349161e8a6086d4c",
+        "type": "function",
+        "z": "012e717f75994bd8",
+        "name": "INSERT quizzy",
+        "func": "var liste = [[\"<title>HTML5-Grundgerüst</title>\", \"Titelzeile im Browserfenster\"],\n[\"<body>\", \"Umschließt den Inhalt, der im Browserfenster angezeigt wird\"],\n['<html lang=\"de\">', \"Umschließt den kompletten Inhalt und es wird im Inhalt als Sprache Deutsch verwendet\"],\n[\"<header> ... </header>\", \"Kopfzeile der HTML-Seite\"],\n[\"<nav> ... </nav>\", \"Bereich zur Steuerung (Navigation) der HTML-Seite\"],\n[\"<main>..</main>\", \"Hauptteil der HTML-Seite\"],\n[\"<h1> … </h1>\", \" Hauptüberschrift - wichtig, sollte einmal auf jeder einzelnen Seite kommen\"],\n[\"<p> … </p>\", \" Absatz - nach dem Absatz wird automatisch Platz gehalten\"],\n[\"<strong> … </strong>\", \"wichtiger Bereich, Schrift wird fett angezeigt\"],\n['<a href=\"URL\">BESCHREIBUNG</a>', \"Hyperlink für interne und externe Links\"],\n['<link rel=\"stylesheet\" href=\"main.css\" type=\"text/css\">', \"Referenz auf eine CSS-Datei\"],\n[\"<ul> … </ul>\", \"Ungeordnete Auflistung\"],\n[\"<li>AUFZÄHLUNGSPUNKT</li>\", \"Jeder einzelne Punkt bei einer Aufzählung muss von diesem HTML-Befehl umschlossen werden.\"]];\nvar quizname=msg.quizname;\nvar message1 = \"INSERT INTO quizzy VALUES(\";\nfor (var i=0; i<liste.length; i++) {\n   var message2 = \"(select rowid from quizzylist where quizname like '\" + quizname + \"'),\" ;\n   message2 += \"'\"+liste[i][0] + \"'\"+ \", '\"  + liste[i][1] + \"'\";\n   if (i< liste.length-1) {\n       message2 += \"), (\";\n   }\n   message1 += message2;\n}\nmsg.payload=message1+\");\";\nmsg.topic=msg.payload;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 740,
+        "y": 560,
+        "wires": [
+            [
+                "af21fc227a455624"
+            ]
+        ]
+    },
+    {
+        "id": "04f43a85de6a5625",
+        "type": "http in",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "url": "/quizzy",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 110,
+        "y": 720,
+        "wires": [
+            [
+                "8cfb7841611d7f83"
+            ]
+        ]
+    },
+    {
+        "id": "fce3a1aa7b8719c7",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "HTML Body",
+        "field": "template.body",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "<div class=\"container\">\n  <h1> Quizzy Auswahl </h1>\n\n  <div class=\"form-group\">\n  <style>\n    strong {font-size: 30px;}\n  </style>\n  <form method=\"GET\" action=\"/quizzy/learn\">\n       \n      <label for=\"QuizzyAuswahl\" class=\"form-label mt-4\">Select Quizname</label>\n      <select name=\"quizname\" class=\"form-select\" id=\"QuizzyAuswahl\">\n      {{#payload}}  \n        <option>{{quizname}}</option>\n      {{/payload}}\n      </select>\n      <br><br>\n      <input name=\"username\" type=\"text\" placeholder=\"Max Mustermann\"></input>\n   <button type=\"submit\" class=\"btn btn-danger\">Quizzy starten</button> \n  </div>\n  <div>\n    <strong id=\"ip\">http://{{payload.ip}}:1880/quizzy</strong>\n    <img src=\"{{payload.qrcodeurl}}\" alt=\"qrcode\">\n  </div>\n</div>\n",
+        "output": "str",
+        "x": 1070,
+        "y": 720,
+        "wires": [
+            [
+                "b5e50a21cff13e8a"
+            ]
+        ]
+    },
+    {
+        "id": "a2ec99ac7dfaffb0",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "SELECT quizzylist",
+        "field": "topic",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "SELECT rowid, * from quizzylist;",
+        "output": "str",
+        "x": 610,
+        "y": 720,
+        "wires": [
+            [
+                "56b8bfc1e1d83dec"
+            ]
+        ]
+    },
+    {
+        "id": "f51d1e81267cb09c",
+        "type": "debug",
+        "z": "012e717f75994bd8",
+        "name": "debug 118",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1150,
+        "y": 520,
+        "wires": []
+    },
+    {
+        "id": "3478e58186fa29de",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "field": "topic",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "SELECT rowid, * FROM quizzy where quizid=(select rowid from quizzylist where quizname LIKE '{{payload.quizname}}' );",
+        "output": "str",
+        "x": 320,
+        "y": 1100,
+        "wires": [
+            [
+                "fe8626d70b093cdb"
+            ]
+        ]
+    },
+    {
+        "id": "4e5e71f2d6f802ff",
+        "type": "function",
+        "z": "012e717f75994bd8",
+        "name": "Payload erweitern",
+        "func": "function shuffle(myArray) {\n    var arrayLength = myArray.length;\n    if (arrayLength == 0) return false; // false wenn das Array leer ist\n    for (var i = 0; i < arrayLength; i++) {\n        //zufaellige Nummer aus dem Array auswaehlen\n        var j = Math.floor(Math.random() * (arrayLength - 1));\n        //aktuelle Arraynummer mit dem zufaellig generierten austauschen (swap)\n        var tempi = myArray[i];\n        var tempj = myArray[j];\n        myArray[i] = tempj;\n        myArray[j] = tempi;\n    }\n    return myArray;\n}\nvar myMessage = msg;\n\n//myMessage.topic=\"quizzy\";\n//myMessage.payload=msg.payload;\nvar sortedArray=new Array(msg.payload.length);\nfor (var i = 0; i < msg.payload.length; i++) {\n    sortedArray[i]=i+1;\n    myMessage.payload[i].origRowId = i+1;\n}\nvar myRandomArray=shuffle(sortedArray);\n\nfor (var i=0; i < msg.payload.length; i++) {\n   \n   myMessage.payload[i].rowid = msg.payload[i].rowid;\n   myMessage.payload[i].randomRowId = myRandomArray[i];\n   myMessage.payload[myRandomArray[i]-1].randomAnswer=msg.payload[i].answer;\n}\nmyMessage.username = msg.req.query.username;\nmyMessage.quizname = msg.req.query.quizname;\nmyMessage.date = new Date();\nmyMessage.totalnumber = msg.payload.length;\nreturn myMessage;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 610,
+        "y": 1040,
+        "wires": [
+            [
+                "d426f562ba66914e"
+            ]
+        ]
+    },
+    {
+        "id": "fa42f62f6f0181d0",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "field": "topic",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "SELECT rowid, * FROM quizzy where quizid=(select rowid from quizzylist where quizname LIKE '{{payload.quizname}}' );",
+        "output": "str",
+        "x": 320,
+        "y": 1040,
+        "wires": [
+            [
+                "f38cc546a2ecb549"
+            ]
+        ]
+    },
+    {
+        "id": "a8cb890ef58a3c11",
+        "type": "http in",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "url": "/quizzy/loesung1",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 140,
+        "y": 860,
+        "wires": [
+            [
+                "9b40bc7b611c9832"
+            ]
+        ]
+    },
+    {
+        "id": "5bbc9933ef97704e",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "HTML Body",
+        "field": "template.body",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "<div class=\"container\">\n  <h1> Quizzy Auswahl </h1>\n\n  <div class=\"form-group\">\n  <form method=\"GET\" action=\"/quizzy/loesung2\">\n       \n      <label for=\"QuizzyAuswahl\" class=\"form-label mt-4\">Select Quizname</label>\n      <select name=\"quizname\" class=\"form-select\" id=\"QuizzyAuswahl\">\n      {{#payload}}  \n        <option>{{quizname}}</option>\n      {{/payload}}\n      </select>\n      <br><br>\n    \n   <button type=\"submit\" class=\"btn btn-danger\">Lösung anzeigen</button> \n  </div>\n</div>\n",
+        "output": "str",
+        "x": 670,
+        "y": 860,
+        "wires": [
+            [
+                "d2094720bdba868a"
+            ]
+        ]
+    },
+    {
+        "id": "9b40bc7b611c9832",
+        "type": "template",
+        "z": "012e717f75994bd8",
+        "name": "SELECT quizzylist",
+        "field": "topic",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "SELECT rowid, * from quizzylist;",
+        "output": "str",
+        "x": 350,
+        "y": 860,
+        "wires": [
+            [
+                "7b5301bca2780d92"
+            ]
+        ]
+    },
+    {
+        "id": "37b944769d5bc6fa",
+        "type": "change",
+        "z": "012e717f75994bd8",
+        "name": "speichere ip",
+        "rules": [
+            {
+                "t": "set",
+                "p": "ip",
+                "pt": "msg",
+                "to": "payload.internalIPv4",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 410,
+        "y": 720,
+        "wires": [
+            [
+                "fd8c692d1ec2145b"
+            ]
+        ]
+    },
+    {
+        "id": "545e2cdf137107ad",
+        "type": "change",
+        "z": "012e717f75994bd8",
+        "name": "setze ip",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload.ip",
+                "pt": "msg",
+                "to": "ip",
+                "tot": "msg"
+            },
+            {
+                "t": "set",
+                "p": "payload.qrcodeurl",
+                "pt": "msg",
+                "to": "qrcodeurl",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 900,
+        "y": 720,
+        "wires": [
+            [
+                "fce3a1aa7b8719c7"
+            ]
+        ]
+    },
+    {
+        "id": "ef719cd2aa862121",
+        "type": "function",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "func": "msg.qrcodeurl= msg.payload;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 860,
+        "y": 780,
+        "wires": [
+            [
+                "a2ec99ac7dfaffb0"
+            ]
+        ]
+    },
+    {
+        "id": "fd8c692d1ec2145b",
+        "type": "function",
+        "z": "012e717f75994bd8",
+        "name": "qrcode",
+        "func": "var qrcodeinput = 'http://' + msg.payload.internalIPv4+':1880/quizzy';\nmsg.qrcodeinput=qrcodeinput;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 570,
+        "y": 780,
+        "wires": [
+            [
+                "eb9ec6ab6d690d2e"
+            ]
+        ]
+    },
+    {
+        "id": "508fb94ea994c197",
+        "type": "inject",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 120,
+        "y": 620,
+        "wires": [
+            [
+                "5c3a9818798b48d4"
+            ]
+        ]
+    },
+    {
+        "id": "8fd3351ce5c50776",
+        "type": "debug",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 390,
+        "y": 620,
+        "wires": []
+    },
+    {
+        "id": "369b2b7e4c6745ad",
+        "type": "sqlite",
+        "z": "012e717f75994bd8",
+        "mydb": "d17f7c2b3c4ee851",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "Quizzy DB",
+        "x": 630,
+        "y": 200,
+        "wires": [
+            [
+                "2b0582b519d990ec"
+            ]
+        ]
+    },
+    {
+        "id": "af21fc227a455624",
+        "type": "sqlite",
+        "z": "012e717f75994bd8",
+        "mydb": "d17f7c2b3c4ee851",
+        "sqlquery": "msg.topic",
+        "sql": "SELECT * FROM feed",
+        "name": "",
+        "x": 930,
+        "y": 520,
+        "wires": [
+            [
+                "f51d1e81267cb09c"
+            ]
+        ]
+    },
+    {
+        "id": "c2d7197ab7902ea4",
+        "type": "sqlite",
+        "z": "012e717f75994bd8",
+        "mydb": "d17f7c2b3c4ee851",
+        "sqlquery": "msg.topic",
+        "sql": "SELECT * FROM feed",
+        "name": "",
+        "x": 610,
+        "y": 1180,
+        "wires": [
+            [
+                "421028e732e057b0"
+            ]
+        ]
+    },
+    {
+        "id": "191a34e8983a2279",
+        "type": "sqlite",
+        "z": "012e717f75994bd8",
+        "mydb": "d17f7c2b3c4ee851",
+        "sqlquery": "msg.topic",
+        "sql": "SELECT rowid, * FROM quizzy_statistik",
+        "name": "",
+        "x": 530,
+        "y": 920,
+        "wires": [
+            [
+                "b02dfa0c5ff4772a"
+            ]
+        ]
+    },
+    {
+        "id": "346dfff4aabc134b",
+        "type": "sqlite",
+        "z": "012e717f75994bd8",
+        "mydb": "d17f7c2b3c4ee851",
+        "sqlquery": "msg.topic",
+        "sql": "SELECT * FROM feed",
+        "name": "",
+        "x": 570,
+        "y": 500,
+        "wires": [
+            [
+                "16cd0588f3e96272"
+            ]
+        ]
+    },
+    {
+        "id": "a1d24a085699d00b",
+        "type": "sqlite",
+        "z": "012e717f75994bd8",
+        "mydb": "d17f7c2b3c4ee851",
+        "sqlquery": "msg.topic",
+        "sql": "SELECT * FROM feed",
+        "name": "",
+        "x": 990,
+        "y": 340,
+        "wires": [
+            [
+                "773d3b8120704cf7"
+            ]
+        ]
+    },
+    {
+        "id": "c219d0b610223427",
+        "type": "sqlite",
+        "z": "012e717f75994bd8",
+        "mydb": "d17f7c2b3c4ee851",
+        "sqlquery": "msg.topic",
+        "sql": "SELECT * FROM feed",
+        "name": "",
+        "x": 590,
+        "y": 560,
+        "wires": [
+            [
+                "349161e8a6086d4c"
+            ]
+        ]
+    },
+    {
+        "id": "56b8bfc1e1d83dec",
+        "type": "sqlite",
+        "z": "012e717f75994bd8",
+        "mydb": "d17f7c2b3c4ee851",
+        "sqlquery": "msg.topic",
+        "sql": "SELECT * FROM feed",
+        "name": "",
+        "x": 770,
+        "y": 720,
+        "wires": [
+            [
+                "545e2cdf137107ad"
+            ]
+        ]
+    },
+    {
+        "id": "fe8626d70b093cdb",
+        "type": "sqlite",
+        "z": "012e717f75994bd8",
+        "mydb": "d17f7c2b3c4ee851",
+        "sqlquery": "msg.topic",
+        "sql": "SELECT rowid, * FROM quizzy_statistik",
+        "name": "",
+        "x": 470,
+        "y": 1100,
+        "wires": [
+            [
+                "1109f3a1c73be2cc"
+            ]
+        ]
+    },
+    {
+        "id": "f38cc546a2ecb549",
+        "type": "sqlite",
+        "z": "012e717f75994bd8",
+        "mydb": "d17f7c2b3c4ee851",
+        "sqlquery": "msg.topic",
+        "sql": "SELECT rowid, * FROM quizzy_statistik",
+        "name": "",
+        "x": 450,
+        "y": 1040,
+        "wires": [
+            [
+                "4e5e71f2d6f802ff"
+            ]
+        ]
+    },
+    {
+        "id": "7b5301bca2780d92",
+        "type": "sqlite",
+        "z": "012e717f75994bd8",
+        "mydb": "d17f7c2b3c4ee851",
+        "sqlquery": "msg.topic",
+        "sql": "SELECT * FROM feed",
+        "name": "",
+        "x": 530,
+        "y": 860,
+        "wires": [
+            [
+                "5bbc9933ef97704e"
+            ]
+        ]
+    },
+    {
+        "id": "8cfb7841611d7f83",
+        "type": "ip",
+        "z": "012e717f75994bd8",
+        "name": "ip",
+        "https": false,
+        "timeout": "5000",
+        "internalIPv4": true,
+        "internalIPv6": false,
+        "publicIPv4": false,
+        "publicIPv6": false,
+        "x": 250,
+        "y": 720,
+        "wires": [
+            [
+                "37b944769d5bc6fa"
+            ]
+        ]
+    },
+    {
+        "id": "5c3a9818798b48d4",
+        "type": "ip",
+        "z": "012e717f75994bd8",
+        "name": "ip",
+        "https": false,
+        "timeout": "5000",
+        "internalIPv4": true,
+        "internalIPv6": false,
+        "publicIPv4": false,
+        "publicIPv6": false,
+        "x": 250,
+        "y": 620,
+        "wires": [
+            [
+                "8fd3351ce5c50776"
+            ]
+        ]
+    },
+    {
+        "id": "eb9ec6ab6d690d2e",
+        "type": "qrcode-generator",
+        "z": "012e717f75994bd8",
+        "name": "",
+        "qrtype": "text2qr",
+        "text2qrText": "",
+        "ssid": "",
+        "hiddenssid": false,
+        "wifitype": "",
+        "phonenum": "",
+        "smsphonenum": "",
+        "smstext": "",
+        "mailto": "",
+        "mailsubject": "",
+        "mailbody": "",
+        "latitude": "",
+        "longitude": "",
+        "colorlight": "#ffffff",
+        "colordark": "#000000",
+        "printstatus": false,
+        "x": 710,
+        "y": 780,
+        "wires": [
+            [
+                "ef719cd2aa862121"
+            ]
+        ]
+    },
+    {
+        "id": "d17f7c2b3c4ee851",
+        "type": "sqlitedb",
+        "db": "quizzy",
+        "mode": "RWC"
+    }
+]
