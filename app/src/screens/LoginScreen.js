@@ -237,8 +237,8 @@ const styles = StyleSheet.create({
 		marginTop: SPACING.sm,
 	},
 	footer: {
-		position: 'absolute',
-		bottom: 40,
+		marginTop: SPACING.xxxl,
+		alignItems: 'center',
 	},
 	footerText: {
 		fontSize: FONTS.sizes.sm,
