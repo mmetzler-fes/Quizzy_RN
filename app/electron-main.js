@@ -1,5 +1,5 @@
 const { app, BrowserWindow } = require('electron');
-const serve = require('electron-serve');
+const serve = require('electron-serve').default;
 
 // Provide the path to the web build output folder ('dist')
 const loadURL = serve({ directory: 'dist' });
