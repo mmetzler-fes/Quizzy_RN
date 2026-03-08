@@ -8,6 +8,7 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	TouchableOpacity,
+	ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
@@ -74,79 +75,85 @@ export default function LoginScreen({ navigation }) {
 		>
 			<KeyboardAvoidingView
 				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-				style={styles.keyboardView}
+				style={{ flex: 1 }}
 			>
-				{/* Decorative circles */}
-				<Animated.View style={[styles.decorCircle1, { opacity: glowAnim }]} />
-				<Animated.View style={[styles.decorCircle2, { opacity: Animated.subtract(1, glowAnim) }]} />
-
-				{/* Logo */}
-				<Animated.View
-					style={[
-						styles.logoContainer,
-						{
-							opacity: fadeAnim,
-							transform: [{ scale: logoScale }],
-						},
-					]}
+				<ScrollView
+					contentContainerStyle={styles.scrollContent}
+					showsVerticalScrollIndicator={false}
+					keyboardShouldPersistTaps="handled"
 				>
-					<LinearGradient
-						colors={[COLORS.primary, '#8B5CF6']}
-						style={styles.logoGradient}
+					{/* Decorative circles */}
+					<Animated.View style={[styles.decorCircle1, { opacity: glowAnim }]} />
+					<Animated.View style={[styles.decorCircle2, { opacity: Animated.subtract(1, glowAnim) }]} />
+
+					{/* Logo */}
+					<Animated.View
+						style={[
+							styles.logoContainer,
+							{
+								opacity: fadeAnim,
+								transform: [{ scale: logoScale }],
+							},
+						]}
 					>
-						<Text style={styles.logoEmoji}>🧠</Text>
-					</LinearGradient>
-					<Text style={styles.title}>Quizzy</Text>
-					<Text style={styles.subtitle}>Lerne smarter, nicht härter</Text>
-				</Animated.View>
+						<LinearGradient
+							colors={[COLORS.primary, '#8B5CF6']}
+							style={styles.logoGradient}
+						>
+							<Text style={styles.logoEmoji}>🧠</Text>
+						</LinearGradient>
+						<Text style={styles.title}>Quizzy</Text>
+						<Text style={styles.subtitle}>Lerne smarter, nicht härter</Text>
+					</Animated.View>
 
-				{/* Login Form */}
-				<Animated.View
-					style={[
-						styles.formContainer,
-						{
-							opacity: fadeAnim,
-							transform: [{ translateY: slideAnim }],
-						},
-					]}
-				>
-					<View style={styles.formCard}>
-						<Text style={styles.welcomeText}>Willkommen!</Text>
-						<Text style={styles.instructionText}>
-							Gib deinen Namen ein, um loszulegen
+					{/* Login Form */}
+					<Animated.View
+						style={[
+							styles.formContainer,
+							{
+								opacity: fadeAnim,
+								transform: [{ translateY: slideAnim }],
+							},
+						]}
+					>
+						<View style={styles.formCard}>
+							<Text style={styles.welcomeText}>Willkommen!</Text>
+							<Text style={styles.instructionText}>
+								Gib deinen Namen ein, um loszulegen
+							</Text>
+
+							<StyledInput
+								label="Benutzername"
+								placeholder="Dein Name..."
+								value={username}
+								onChangeText={setUsername}
+								returnKeyType="go"
+								onSubmitEditing={handleLogin}
+								autoCapitalize="words"
+							/>
+
+							<GradientButton
+								title="Los geht's  →"
+								onPress={handleLogin}
+								disabled={!username.trim()}
+								style={styles.loginButton}
+							/>
+						</View>
+					</Animated.View>
+
+					{/* Footer */}
+					<Animated.View style={[styles.footer, { opacity: fadeAnim }]}>
+						<Text style={styles.footerText}>
+							📚 Quiz • 📝 Vokabeln • 📊 Lernen
 						</Text>
-
-						<StyledInput
-							label="Benutzername"
-							placeholder="Dein Name..."
-							value={username}
-							onChangeText={setUsername}
-							returnKeyType="go"
-							onSubmitEditing={handleLogin}
-							autoCapitalize="words"
-						/>
-
-						<GradientButton
-							title="Los geht's  →"
-							onPress={handleLogin}
-							disabled={!username.trim()}
-							style={styles.loginButton}
-						/>
-					</View>
-				</Animated.View>
-
-				{/* Footer */}
-				<Animated.View style={[styles.footer, { opacity: fadeAnim }]}>
-					<Text style={styles.footerText}>
-						📚 Quiz • 📝 Vokabeln • 📊 Lernen
-					</Text>
-					<TouchableOpacity
-						onPress={() => navigation.navigate('Admin')}
-						style={styles.adminLink}
-					>
-						<Text style={styles.adminLinkText}>🔐 Lehrer-Bereich</Text>
-					</TouchableOpacity>
-				</Animated.View>
+						<TouchableOpacity
+							onPress={() => navigation.navigate('Admin')}
+							style={styles.adminLink}
+						>
+							<Text style={styles.adminLinkText}>🔐 Lehrer-Bereich</Text>
+						</TouchableOpacity>
+					</Animated.View>
+				</ScrollView>
 			</KeyboardAvoidingView>
 		</LinearGradient>
 	);
@@ -156,11 +163,12 @@ const styles = StyleSheet.create({
 	container: {
 		flex: 1,
 	},
-	keyboardView: {
-		flex: 1,
+	scrollContent: {
+		flexGrow: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
 		paddingHorizontal: SPACING.xxl,
+		paddingVertical: SPACING.xxxl,
 	},
 	decorCircle1: {
 		position: 'absolute',
