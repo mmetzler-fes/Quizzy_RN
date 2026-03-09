@@ -1,5 +1,7 @@
 const { app, BrowserWindow } = require('electron');
 const serve = require('electron-serve').default;
+const express = require('express');
+const path = require('path');
 
 // Provide the path to the web build output folder ('dist')
 const loadURL = serve({ directory: 'dist' });
@@ -27,7 +29,28 @@ function createWindow() {
 }
 
 // When Electron has finished initialization, create window
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+	createWindow();
+
+	// Start local server for external access (Students)
+	try {
+		const serverApp = express();
+		const distPath = path.join(__dirname, 'dist');
+
+		serverApp.use(express.static(distPath));
+
+		// Fallback for SPA routing
+		serverApp.get('*', (req, res) => {
+			res.sendFile(path.join(distPath, 'index.html'));
+		});
+
+		serverApp.listen(3000, '0.0.0.0', () => {
+			console.log('Local Server running on port 3000 (0.0.0.0)');
+		});
+	} catch (err) {
+		console.error('Failed to start local web server:', err);
+	}
+});
 
 // Quit when all windows are closed.
 app.on('window-all-closed', () => {
