@@ -69,9 +69,6 @@ export default function QuizScreen({ route }) {
 	useFocusEffect(
 		useCallback(() => { loadQuizNames(); }, [])
 	);
-	useEffect(() => {
-		Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-	}, [selectedQuiz, submitted]);
 
 	const loadQuizNames = async () => {
 		try {
@@ -90,14 +87,36 @@ export default function QuizScreen({ route }) {
 		setLoading(true);
 		try {
 			const data = await getQuizByName(name);
+			const shuffled1 = shuffle([...data]);
+			let shuffled2 = shuffle([...data]);
+
+			// Guaranteed derangement: make sure no description identically matches its term row initially
+			if (data.length > 1) {
+				let attempts = 0;
+				while (attempts < 15) {
+					let hasMatch = false;
+					for (let i = 0; i < data.length; i++) {
+						if (shuffled1[i].id === shuffled2[i].id) {
+							hasMatch = true;
+							break;
+						}
+					}
+					if (!hasMatch) break;
+					shuffled2 = shuffle([...data]);
+					attempts++;
+				}
+			}
+
 			setQuizData(data);
-			setShuffledTerms(shuffle(data));  // independent shuffle for left column
-			setShuffledDescs(shuffle(data));  // independent shuffle for right column
+			setShuffledTerms(shuffled1);  // left column
+			setShuffledDescs(shuffled2);  // right column
 			setSelectedQuiz(name);
 			setUserAnswers({});
 			setSubmitted(false);
 			setScore(null);
+
 			fadeAnim.setValue(0);
+			Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
 		} catch (e) { console.error(e); } finally { setLoading(false); }
 	};
 
@@ -172,7 +191,7 @@ export default function QuizScreen({ route }) {
 	const handleSubmit = async () => {
 		const allFilled = shuffledDescs.every((_, idx) => userAnswers[idx] !== undefined);
 		if (!allFilled) {
-			Alert.alert('Nicht komplett', 'Bitte ziehe alle Begriffe auf die Fragezeichen.');
+			window.alert('Bitte ziehe alle Begriffe auf die Fragezeichen.');
 			return;
 		}
 		let correct = 0;
@@ -193,6 +212,7 @@ export default function QuizScreen({ route }) {
 		setScore(correct);
 		setSubmitted(true);
 		fadeAnim.setValue(0);
+		Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
 		try { await saveQuizResult(username, selectedQuiz, correct, quizData.length, details); }
 		catch (e) { console.error(e); }
 	};

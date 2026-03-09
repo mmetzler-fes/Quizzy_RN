@@ -326,11 +326,11 @@ function QuizManagementTab() {
 	// --- TOPIC ACTIONS ---
 	const handleCreateTopic = () => {
 		if (!newTopicName.trim()) {
-			Alert.alert('Fehler', 'Bitte einen Themenamen eingeben.');
+			window.alert('Bitte einen Themennamen eingeben.');
 			return;
 		}
 		if (quizNames.includes(newTopicName.trim())) {
-			Alert.alert('Fehler', 'Dieses Thema existiert bereits.');
+			window.alert('Dieses Thema existiert bereits.');
 			return;
 		}
 		// Just navigate to the new topic - first question will create it
@@ -425,7 +425,7 @@ function QuizManagementTab() {
 	// --- QUESTION ACTIONS ---
 	const handleAddQuestion = async () => {
 		if (!newQuery.trim() || !newAnswer.trim()) {
-			Alert.alert('Fehler', 'Bitte Frage und Antwort ausfüllen.');
+			window.alert('Bitte Frage und Antwort ausfüllen.');
 			return;
 		}
 		try {
@@ -457,7 +457,7 @@ function QuizManagementTab() {
 
 	const handleSaveEdit = async () => {
 		if (!editQuery.trim() || !editAnswer.trim()) {
-			Alert.alert('Fehler', 'Frage und Antwort dürfen nicht leer sein.');
+			window.alert('Frage und Antwort dürfen nicht leer sein.');
 			return;
 		}
 		try {
