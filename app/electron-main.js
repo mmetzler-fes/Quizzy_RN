@@ -30,6 +30,9 @@ function createWindow() {
 	});
 }
 
+// Disable sandboxing on Linux to avoid SUID sandbox errors with AppImage
+app.commandLine.appendSwitch('no-sandbox');
+
 // When Electron has finished initialization, start server then window
 app.whenReady().then(() => {
 	// Start local server for external access (Students)
