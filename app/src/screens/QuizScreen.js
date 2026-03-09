@@ -54,6 +54,7 @@ export default function QuizScreen({ route }) {
 	const [loading, setLoading] = useState(true);
 	const [activeHover, setActiveHover] = useState(null);
 	const [draggingTermIdx, setDraggingTermIdx] = useState(null); // termIdx in shuffledTerms
+	const [fadeTrigger, setFadeTrigger] = useState(0);
 
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const ghostX = useRef(new Animated.Value(0)).current;
@@ -69,6 +70,11 @@ export default function QuizScreen({ route }) {
 	useFocusEffect(
 		useCallback(() => { loadQuizNames(); }, [])
 	);
+
+	useEffect(() => {
+		fadeAnim.setValue(0);
+		Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+	}, [fadeTrigger]);
 
 	const loadQuizNames = async () => {
 		try {
@@ -115,8 +121,7 @@ export default function QuizScreen({ route }) {
 			setSubmitted(false);
 			setScore(null);
 
-			fadeAnim.setValue(0);
-			Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+			setFadeTrigger(t => t + 1);
 		} catch (e) { console.error(e); } finally { setLoading(false); }
 	};
 
@@ -211,8 +216,7 @@ export default function QuizScreen({ route }) {
 		});
 		setScore(correct);
 		setSubmitted(true);
-		fadeAnim.setValue(0);
-		Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+		setFadeTrigger(t => t + 1);
 		try { await saveQuizResult(username, selectedQuiz, correct, quizData.length, details); }
 		catch (e) { console.error(e); }
 	};
