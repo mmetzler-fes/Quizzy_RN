@@ -1,4 +1,11 @@
 const { app, BrowserWindow } = require('electron');
+
+// CRITICAL: Disable Sandbox on Linux immediately before other synchronous native requires!
+// This strictly enforces the bypass for the SUID error we see in AppImage builds.
+process.env.ELECTRON_DISABLE_SANDBOX = '1';
+app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('disable-setuid-sandbox');
+
 const serve = require('electron-serve').default;
 const express = require('express');
 const cors = require('cors');
@@ -29,10 +36,6 @@ function createWindow() {
 		mainWindow = null;
 	});
 }
-
-// Disable sandboxing on Linux to avoid SUID sandbox errors with AppImage
-app.commandLine.appendSwitch('no-sandbox');
-app.commandLine.appendSwitch('disable-setuid-sandbox');
 
 // When Electron has finished initialization, start server then window
 app.whenReady().then(() => {
