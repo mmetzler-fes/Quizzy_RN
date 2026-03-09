@@ -6,7 +6,11 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "electron:web": "expo export --platform web",
+    "electron:start": "npm run electron:web && electron .",
+    "electron:build:linux": "npm run electron:web && electron-builder --linux --publish never",
+    "electron:build:win": "npm run electron:web && electron-builder --win nsis --publish never"
   },
   "dependencies": {
     "expo": "~55.0.5",
@@ -15,6 +19,40 @@
     "react-dom": "^19.2.0",
     "react-native": "0.83.2",
     "react-native-web": "^0.21.0"
+  },
+  "devDependencies": {
+    "electron": "^40.8.0",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.quizzy.app",
+    "productName": "Quizzy",
+    "extraMetadata": {
+      "main": "electron-main.js"
+    },
+    "directories": {
+      "buildResources": "assets",
+      "output": "release"
+    },
+    "files": [
+      "electron-main.js",
+      "dist/**/*",
+      "assets/icon.png"
+    ],
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png",
+      "category": "Game",
+      "executableArgs": ["--no-sandbox"]
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "private": true
 }
