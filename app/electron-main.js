@@ -1,7 +1,17 @@
 const { app, BrowserWindow } = require('electron');
+const { spawn } = require('child_process');
 
-// CRITICAL: Disable Sandbox on Linux immediately before other synchronous native requires!
-// This strictly enforces the bypass for the SUID error we see in AppImage builds.
+// --- LINUX SANDBOX FIX (SELF-RELAUNCH) ---
+// On many Linux distros, the SUID sandbox fails inside AppImages. 
+// We must pass --no-sandbox at the OS process level. 
+// If it's missing, we relaunch the app with the flag injected.
+if (process.platform === 'linux' && !process.argv.includes('--no-sandbox')) {
+	const args = [...process.argv.slice(1), '--no-sandbox', '--disable-setuid-sandbox'];
+	spawn(process.execPath, args, { stdio: 'inherit', detached: true }).unref();
+	app.exit(0);
+}
+
+// CRITICAL: Disable Sandbox on Linux immediately (backup for the relaunched process)
 process.env.ELECTRON_DISABLE_SANDBOX = '1';
 app.commandLine.appendSwitch('no-sandbox');
 app.commandLine.appendSwitch('disable-setuid-sandbox');
