@@ -12,8 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SHADOWS } from '../styles/theme';
 import { GradientButton, Card, LoadingView, EmptyState, Badge } from '../components/UI';
-import { getQuizByName, getQuizNames, saveQuizResult } from '../database/database';
-import { getSelectedTopics } from './QuizManageScreen';
+import { getQuizNames, getQuizByName, saveQuizResult, getSelectedTopics } from '../database/database';
 
 function shuffle(array) {
 	const arr = [...array];

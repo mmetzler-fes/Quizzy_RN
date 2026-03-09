@@ -8,23 +8,7 @@ import {
 	Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
-import { LoadingView, EmptyState } from '../components/UI';
-import { getQuizNames } from '../database/database';
-
-const SELECTED_KEY = '@quizzy_selected_topics';
-
-export async function getSelectedTopics() {
-	try {
-		const raw = await AsyncStorage.getItem(SELECTED_KEY);
-		return raw ? JSON.parse(raw) : null; // null = all selected (no filter)
-	} catch {
-		return null;
-	}
-}
+import { getQuizNames, getSelectedTopics, saveSelectedTopics } from '../database/database';
 
 export default function QuizManageScreen() {
 	const [allTopics, setAllTopics] = useState([]);
@@ -45,9 +29,9 @@ export default function QuizManageScreen() {
 			setAllTopics(topics);
 
 			// Load saved selection; if none saved → select all by default
-			const raw = await AsyncStorage.getItem(SELECTED_KEY);
-			if (raw) {
-				setSelected(new Set(JSON.parse(raw)));
+			const saved = await getSelectedTopics();
+			if (saved !== null) {
+				setSelected(new Set(saved));
 			} else {
 				setSelected(new Set(topics)); // all selected by default
 			}
@@ -66,20 +50,20 @@ export default function QuizManageScreen() {
 			next.add(name);
 		}
 		setSelected(next);
-		await AsyncStorage.setItem(SELECTED_KEY, JSON.stringify([...next]));
+		await saveSelectedTopics([...next]);
 		flashSaved();
 	};
 
 	const selectAll = async () => {
 		const next = new Set(allTopics);
 		setSelected(next);
-		await AsyncStorage.setItem(SELECTED_KEY, JSON.stringify([...next]));
+		await saveSelectedTopics([...next]);
 		flashSaved();
 	};
 
 	const deselectAll = async () => {
 		setSelected(new Set());
-		await AsyncStorage.setItem(SELECTED_KEY, JSON.stringify([]));
+		await saveSelectedTopics([]);
 		flashSaved();
 	};
 

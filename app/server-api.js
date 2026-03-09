@@ -18,6 +18,7 @@ module.exports = function setupApi(app, userDataPath) {
 				],
 				vokabeln: [],
 				results: [],
+				selectedTopics: null,
 				admin: { username: 'admin', password: 'lehrer1' },
 				initialized: true,
 				nextQuizId: 10,
@@ -82,6 +83,18 @@ module.exports = function setupApi(app, userDataPath) {
 			db.quizzes[index] = { ...db.quizzes[index], quizname, query, answer };
 			writeDB(db);
 		}
+		res.json({ success: true });
+	});
+
+	app.get('/api/selectedTopics', (req, res) => {
+		const db = readDB();
+		res.json({ selectedTopics: db.selectedTopics || null });
+	});
+
+	app.put('/api/selectedTopics', (req, res) => {
+		const db = readDB();
+		db.selectedTopics = req.body.selectedTopics;
+		writeDB(db);
 		res.json({ success: true });
 	});
 

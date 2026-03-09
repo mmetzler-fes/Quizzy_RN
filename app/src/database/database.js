@@ -34,6 +34,15 @@ export async function initDatabase() {
 
 // === QUIZZY CRUD ===
 
+export async function getSelectedTopics() {
+  const res = await apiFetch('/api/selectedTopics', 'GET');
+  return res.selectedTopics;
+}
+
+export async function saveSelectedTopics(topics) {
+  await apiFetch('/api/selectedTopics', 'PUT', { selectedTopics: topics });
+}
+
 export async function getQuizNames() {
   return await apiFetch('/api/quizNames', 'GET');
 }
