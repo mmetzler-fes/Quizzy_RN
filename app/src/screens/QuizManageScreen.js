@@ -1,335 +1,313 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
 	View,
 	Text,
-	FlatList,
+	ScrollView,
 	TouchableOpacity,
 	StyleSheet,
-	Alert,
 	Animated,
-	TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
-import {
-	GradientButton,
-	Card,
-	StyledInput,
-	LoadingView,
-	EmptyState,
-	Badge,
-} from '../components/UI';
-import {
-	getAllQuizItems,
-	addQuizItem,
-	deleteQuizItem,
-	getQuizNames,
-} from '../database/database';
+import { LoadingView, EmptyState } from '../components/UI';
+import { getQuizNames } from '../database/database';
+
+const SELECTED_KEY = '@quizzy_selected_topics';
+
+export async function getSelectedTopics() {
+	try {
+		const raw = await AsyncStorage.getItem(SELECTED_KEY);
+		return raw ? JSON.parse(raw) : null; // null = all selected (no filter)
+	} catch {
+		return null;
+	}
+}
 
 export default function QuizManageScreen() {
-	const [quizItems, setQuizItems] = useState([]);
+	const [allTopics, setAllTopics] = useState([]);
+	const [selected, setSelected] = useState(new Set()); // selected topic names
 	const [loading, setLoading] = useState(true);
-	const [showForm, setShowForm] = useState(false);
-	const [quizname, setQuizname] = useState('');
-	const [query, setQuery] = useState('');
-	const [answer, setAnswer] = useState('');
-	const [searchText, setSearchText] = useState('');
-
-	const formAnim = useRef(new Animated.Value(0)).current;
+	const [savedAnim] = useState(new Animated.Value(0));
+	const [showSaved, setShowSaved] = useState(false);
 
 	useEffect(() => {
 		loadData();
 	}, []);
 
-	useEffect(() => {
-		Animated.timing(formAnim, {
-			toValue: showForm ? 1 : 0,
-			duration: 300,
-			useNativeDriver: false,
-		}).start();
-	}, [showForm]);
-
 	const loadData = async () => {
 		try {
-			const items = await getAllQuizItems();
-			setQuizItems(items);
-		} catch (error) {
-			console.error('Error loading quiz items:', error);
+			const topics = await getQuizNames();
+			setAllTopics(topics);
+
+			// Load saved selection; if none saved → select all by default
+			const raw = await AsyncStorage.getItem(SELECTED_KEY);
+			if (raw) {
+				setSelected(new Set(JSON.parse(raw)));
+			} else {
+				setSelected(new Set(topics)); // all selected by default
+			}
+		} catch (e) {
+			console.error(e);
 		} finally {
 			setLoading(false);
 		}
 	};
 
-	const handleAdd = async () => {
-		if (!quizname.trim() || !query.trim() || !answer.trim()) {
-			Alert.alert('Fehler', 'Bitte alle Felder ausfüllen.');
-			return;
+	const toggleTopic = async (name) => {
+		const next = new Set(selected);
+		if (next.has(name)) {
+			next.delete(name);
+		} else {
+			next.add(name);
 		}
-
-		try {
-			await addQuizItem(quizname.trim(), query.trim(), answer.trim());
-			setQuizname('');
-			setQuery('');
-			setAnswer('');
-			setShowForm(false);
-			loadData();
-		} catch (error) {
-			Alert.alert('Fehler', 'Konnte nicht gespeichert werden.');
-		}
+		setSelected(next);
+		await AsyncStorage.setItem(SELECTED_KEY, JSON.stringify([...next]));
+		flashSaved();
 	};
 
-	const handleDelete = (id, term) => {
-		Alert.alert(
-			'Löschen?',
-			`Möchtest du "${term}" wirklich löschen?`,
-			[
-				{ text: 'Abbrechen', style: 'cancel' },
-				{
-					text: 'Löschen',
-					style: 'destructive',
-					onPress: async () => {
-						await deleteQuizItem(id);
-						loadData();
-					},
-				},
-			]
-		);
+	const selectAll = async () => {
+		const next = new Set(allTopics);
+		setSelected(next);
+		await AsyncStorage.setItem(SELECTED_KEY, JSON.stringify([...next]));
+		flashSaved();
 	};
 
-	const filteredItems = searchText
-		? quizItems.filter(
-			(item) =>
-				item.query.toLowerCase().includes(searchText.toLowerCase()) ||
-				item.answer.toLowerCase().includes(searchText.toLowerCase()) ||
-				item.quizname.toLowerCase().includes(searchText.toLowerCase())
-		)
-		: quizItems;
+	const deselectAll = async () => {
+		setSelected(new Set());
+		await AsyncStorage.setItem(SELECTED_KEY, JSON.stringify([]));
+		flashSaved();
+	};
 
-	// Group by quizname
-	const grouped = filteredItems.reduce((acc, item) => {
-		if (!acc[item.quizname]) acc[item.quizname] = [];
-		acc[item.quizname].push(item);
-		return acc;
-	}, {});
+	const flashSaved = () => {
+		setShowSaved(true);
+		savedAnim.setValue(0);
+		Animated.sequence([
+			Animated.timing(savedAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+			Animated.delay(1200),
+			Animated.timing(savedAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+		]).start(() => setShowSaved(false));
+	};
 
-	if (loading) return <LoadingView message="Daten werden geladen..." />;
+	if (loading) return <LoadingView message="Themen werden geladen..." />;
 
-	const formMaxHeight = formAnim.interpolate({
-		inputRange: [0, 1],
-		outputRange: [0, 500],
-	});
-
-	const renderItem = ({ item }) => (
-		<View style={styles.listItem}>
-			<View style={styles.listItemContent}>
-				<Text style={styles.listItemTerm}>{item.query}</Text>
-				<Text style={styles.listItemAnswer} numberOfLines={2}>
-					{item.answer}
-				</Text>
-			</View>
-			<TouchableOpacity
-				onPress={() => handleDelete(item.id, item.query)}
-				style={styles.deleteButton}
-			>
-				<Text style={styles.deleteText}>🗑️</Text>
-			</TouchableOpacity>
-		</View>
-	);
-
-	const renderGroupHeader = (quizname, items) => (
-		<View key={quizname}>
-			<View style={styles.groupHeader}>
-				<Badge text={quizname} variant="primary" />
-				<Text style={styles.groupCount}>{items.length} Einträge</Text>
-			</View>
-			{items.map((item) => (
-				<View key={item.id}>{renderItem({ item })}</View>
-			))}
-		</View>
-	);
+	const allChecked = allTopics.every(t => selected.has(t));
+	const noneChecked = allTopics.every(t => !selected.has(t));
 
 	return (
 		<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
-			{/* Search bar */}
-			<View style={styles.searchBar}>
-				<TextInput
-					style={styles.searchInput}
-					placeholder="🔍  Suchen..."
-					placeholderTextColor={COLORS.textMuted}
-					value={searchText}
-					onChangeText={setSearchText}
-				/>
-				<TouchableOpacity
-					style={styles.addToggle}
-					onPress={() => setShowForm(!showForm)}
-				>
-					<LinearGradient
-						colors={showForm ? [COLORS.error, '#F87171'] : [COLORS.primary, '#8B5CF6']}
-						style={styles.addToggleGradient}
-					>
-						<Text style={styles.addToggleText}>{showForm ? '✕' : '+'}</Text>
-					</LinearGradient>
-				</TouchableOpacity>
+
+			{/* Header */}
+			<View style={styles.header}>
+				<Text style={styles.title}>📋 Themen auswählen</Text>
+				<Text style={styles.subtitle}>
+					Wähle aus, welche Themen im Quiz abgefragt werden sollen.
+				</Text>
 			</View>
 
-			{/* Add form */}
-			<Animated.View style={[styles.formWrapper, { maxHeight: formMaxHeight, opacity: formAnim }]}>
-				<Card style={styles.formCard}>
-					<Text style={styles.formTitle}>Neuen Quiz-Eintrag hinzufügen</Text>
-					<StyledInput
-						label="Quizname"
-						placeholder="z.B. DB Grundbegriffe"
-						value={quizname}
-						onChangeText={setQuizname}
-					/>
-					<StyledInput
-						label="Begriff / Frage"
-						placeholder="z.B. Primary Key"
-						value={query}
-						onChangeText={setQuery}
-					/>
-					<StyledInput
-						label="Antwort / Definition"
-						placeholder="Die Definition..."
-						value={answer}
-						onChangeText={setAnswer}
-						multiline
-					/>
-					<GradientButton
-						title="💾  Speichern"
-						onPress={handleAdd}
-						variant="success"
-					/>
-				</Card>
-			</Animated.View>
+			{/* Select all / none buttons */}
+			{allTopics.length > 0 && (
+				<View style={styles.bulkRow}>
+					<TouchableOpacity
+						style={[styles.bulkBtn, allChecked && styles.bulkBtnActive]}
+						onPress={selectAll}
+					>
+						<Text style={[styles.bulkBtnText, allChecked && styles.bulkBtnTextActive]}>
+							✓ Alle auswählen
+						</Text>
+					</TouchableOpacity>
+					<TouchableOpacity
+						style={[styles.bulkBtn, noneChecked && styles.bulkBtnDanger]}
+						onPress={deselectAll}
+					>
+						<Text style={[styles.bulkBtnText, noneChecked && styles.bulkBtnTextDanger]}>
+							✕ Alle abwählen
+						</Text>
+					</TouchableOpacity>
+				</View>
+			)}
 
-			{/* List */}
-			<FlatList
-				data={[{ key: 'content' }]}
-				renderItem={() => (
-					<View style={styles.listContainer}>
-						{Object.keys(grouped).length === 0 ? (
-							<EmptyState
-								icon="📝"
-								title="Keine Quiz-Einträge"
-								subtitle="Tippe auf + um neue Einträge hinzuzufügen."
-							/>
-						) : (
-							Object.entries(grouped).map(([name, items]) =>
-								renderGroupHeader(name, items)
-							)
-						)}
-					</View>
+			{/* Topic list */}
+			<ScrollView
+				style={{ flex: 1 }}
+				contentContainerStyle={styles.listContent}
+				showsVerticalScrollIndicator={false}
+			>
+				{allTopics.length === 0 ? (
+					<EmptyState
+						icon="📚"
+						title="Keine Themen vorhanden"
+						subtitle="Der Lehrer muss zuerst Quiz-Themen anlegen."
+					/>
+				) : (
+					allTopics.map((name) => {
+						const isChecked = selected.has(name);
+						return (
+							<TouchableOpacity
+								key={name}
+								style={[styles.topicRow, isChecked && styles.topicRowChecked]}
+								onPress={() => toggleTopic(name)}
+								activeOpacity={0.7}
+							>
+								{/* Checkbox */}
+								<View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
+									{isChecked && <Text style={styles.checkmark}>✓</Text>}
+								</View>
+
+								{/* Topic icon + name */}
+								<View style={styles.topicIcon}>
+									<Text style={styles.topicEmoji}>📚</Text>
+								</View>
+								<Text style={[styles.topicName, isChecked && styles.topicNameChecked]}>
+									{name}
+								</Text>
+							</TouchableOpacity>
+						);
+					})
 				)}
-				contentContainerStyle={styles.flatListContent}
-			/>
+			</ScrollView>
+
+			{/* Saved toast */}
+			{showSaved && (
+				<Animated.View style={[styles.savedToast, { opacity: savedAnim }]}>
+					<Text style={styles.savedToastText}>✓ Gespeichert</Text>
+				</Animated.View>
+			)}
 		</LinearGradient>
 	);
 }
 
 const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-	},
-	searchBar: {
-		flexDirection: 'row',
-		paddingHorizontal: SPACING.lg,
-		paddingTop: SPACING.lg,
-		paddingBottom: SPACING.sm,
-		alignItems: 'center',
-		gap: SPACING.md,
-	},
-	searchInput: {
-		flex: 1,
-		backgroundColor: COLORS.surface,
-		borderWidth: 1,
-		borderColor: COLORS.border,
-		borderRadius: RADIUS.full,
+	container: { flex: 1 },
+
+	header: {
 		paddingHorizontal: SPACING.xl,
-		paddingVertical: SPACING.md,
-		fontSize: FONTS.sizes.md,
-		color: COLORS.textPrimary,
+		paddingTop: SPACING.xl,
+		paddingBottom: SPACING.md,
 	},
-	addToggle: {
-		borderRadius: RADIUS.full,
-		overflow: 'hidden',
-	},
-	addToggleGradient: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	addToggleText: {
-		color: COLORS.white,
+	title: {
 		fontSize: FONTS.sizes.xxl,
 		fontWeight: FONTS.weights.bold,
-	},
-
-	// Form
-	formWrapper: {
-		overflow: 'hidden',
-		paddingHorizontal: SPACING.lg,
-	},
-	formCard: {
-		marginTop: SPACING.sm,
-		marginBottom: SPACING.md,
-	},
-	formTitle: {
-		fontSize: FONTS.sizes.lg,
-		fontWeight: FONTS.weights.bold,
 		color: COLORS.textPrimary,
-		marginBottom: SPACING.lg,
+		marginBottom: SPACING.xs,
 	},
-
-	// List
-	flatListContent: {
-		paddingBottom: SPACING.huge,
-	},
-	listContainer: {
-		paddingHorizontal: SPACING.lg,
-	},
-	groupHeader: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginTop: SPACING.xl,
-		marginBottom: SPACING.md,
-	},
-	groupCount: {
-		fontSize: FONTS.sizes.sm,
-		color: COLORS.textMuted,
-	},
-	listItem: {
-		flexDirection: 'row',
-		backgroundColor: COLORS.surface,
-		borderRadius: RADIUS.md,
-		padding: SPACING.md,
-		marginBottom: SPACING.sm,
-		borderWidth: 1,
-		borderColor: COLORS.border,
-		alignItems: 'center',
-	},
-	listItemContent: {
-		flex: 1,
-	},
-	listItemTerm: {
-		fontSize: FONTS.sizes.md,
-		fontWeight: FONTS.weights.semiBold,
-		color: COLORS.textPrimary,
-		marginBottom: 2,
-	},
-	listItemAnswer: {
+	subtitle: {
 		fontSize: FONTS.sizes.sm,
 		color: COLORS.textMuted,
 		lineHeight: 18,
 	},
-	deleteButton: {
-		padding: SPACING.sm,
-		marginLeft: SPACING.sm,
+
+	bulkRow: {
+		flexDirection: 'row',
+		paddingHorizontal: SPACING.xl,
+		paddingBottom: SPACING.md,
+		gap: SPACING.md,
 	},
-	deleteText: {
-		fontSize: 20,
+	bulkBtn: {
+		flex: 1,
+		paddingVertical: SPACING.sm,
+		paddingHorizontal: SPACING.md,
+		borderRadius: RADIUS.full,
+		borderWidth: 1,
+		borderColor: COLORS.border,
+		backgroundColor: COLORS.surface,
+		alignItems: 'center',
+	},
+	bulkBtnActive: {
+		borderColor: COLORS.success + '80',
+		backgroundColor: COLORS.success + '15',
+	},
+	bulkBtnDanger: {
+		borderColor: COLORS.error + '80',
+		backgroundColor: COLORS.error + '15',
+	},
+	bulkBtnText: {
+		fontSize: FONTS.sizes.sm,
+		color: COLORS.textMuted,
+		fontWeight: FONTS.weights.medium,
+	},
+	bulkBtnTextActive: { color: COLORS.success },
+	bulkBtnTextDanger: { color: COLORS.error },
+
+	listContent: {
+		paddingHorizontal: SPACING.xl,
+		paddingBottom: SPACING.huge,
+	},
+
+	topicRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: COLORS.surface,
+		borderRadius: RADIUS.lg,
+		padding: SPACING.lg,
+		marginBottom: SPACING.md,
+		borderWidth: 1.5,
+		borderColor: COLORS.border,
+		...SHADOWS.sm,
+	},
+	topicRowChecked: {
+		borderColor: COLORS.primary + '80',
+		backgroundColor: COLORS.primary + '12',
+	},
+
+	checkbox: {
+		width: 24,
+		height: 24,
+		borderRadius: 6,
+		borderWidth: 2,
+		borderColor: COLORS.border,
+		backgroundColor: COLORS.background,
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: SPACING.md,
+		flexShrink: 0,
+	},
+	checkboxChecked: {
+		borderColor: COLORS.primary,
+		backgroundColor: COLORS.primary,
+	},
+	checkmark: {
+		color: COLORS.white,
+		fontSize: 14,
+		fontWeight: FONTS.weights.bold,
+		lineHeight: 16,
+	},
+
+	topicIcon: {
+		width: 36,
+		height: 36,
+		borderRadius: RADIUS.md,
+		backgroundColor: COLORS.primary + '20',
+		alignItems: 'center',
+		justifyContent: 'center',
+		marginRight: SPACING.md,
+		flexShrink: 0,
+	},
+	topicEmoji: { fontSize: 18 },
+
+	topicName: {
+		flex: 1,
+		fontSize: FONTS.sizes.md,
+		fontWeight: FONTS.weights.semiBold,
+		color: COLORS.textSecondary,
+	},
+	topicNameChecked: {
+		color: COLORS.textPrimary,
+	},
+
+	savedToast: {
+		position: 'absolute',
+		bottom: SPACING.xxl,
+		alignSelf: 'center',
+		backgroundColor: COLORS.success,
+		paddingHorizontal: SPACING.xl,
+		paddingVertical: SPACING.sm,
+		borderRadius: RADIUS.full,
+		...SHADOWS.md,
+	},
+	savedToastText: {
+		color: COLORS.white,
+		fontWeight: FONTS.weights.bold,
+		fontSize: FONTS.sizes.sm,
 	},
 });

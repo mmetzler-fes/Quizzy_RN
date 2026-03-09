@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
 	View,
 	Text,
@@ -8,9 +8,11 @@ import {
 	Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { Card, GradientButton, Badge, LoadingView, EmptyState } from '../components/UI';
-import { getAllQuizItems } from '../database/database';
+import { getAllQuizItems, getQuizByName, getQuizNames } from '../database/database';
+import { getSelectedTopics } from './QuizManageScreen';
 
 function shuffle(array) {
 	const arr = [...array];
@@ -32,13 +34,35 @@ export default function VokabelLearnScreen() {
 	const flipAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(0)).current;
 
-	useEffect(() => {
-		loadData();
-	}, []);
+	// Re-run every time this tab comes into focus so topic selection changes are picked up
+	useFocusEffect(
+		useCallback(() => {
+			// Reset session state before loading new data
+			setCurrentIndex(0);
+			setShowAnswer(false);
+			setScore({ correct: 0, wrong: 0 });
+			setFinished(false);
+			flipAnim.setValue(0);
+			slideAnim.setValue(0);
+			setLoading(true);
+			loadData();
+		}, [])
+	);
 
 	const loadData = async () => {
 		try {
-			const data = await getAllQuizItems();
+			const selectedTopics = await getSelectedTopics();
+			let data;
+			if (selectedTopics && selectedTopics.length > 0) {
+				// Load items only from selected topics
+				const allItems = await Promise.all(
+					selectedTopics.map(name => getQuizByName(name))
+				);
+				data = allItems.flat();
+			} else {
+				// Fallback: load everything
+				data = await getAllQuizItems();
+			}
 			setVokabeln(shuffle(data));
 		} catch (error) {
 			console.error('Error:', error);

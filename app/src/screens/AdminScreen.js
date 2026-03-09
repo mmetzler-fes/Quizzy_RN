@@ -150,18 +150,18 @@ function ResultsTab() {
 		}
 	};
 
-	const handleDeleteResult = (id, username) => {
-		Alert.alert('Ergebnis löschen?', `Möchtest du das Ergebnis von "${username}" wirklich löschen?`, [
-			{ text: 'Abbrechen', style: 'cancel' },
-			{ text: 'Löschen', style: 'destructive', onPress: async () => { await deleteQuizResult(id); loadResults(); } },
-		]);
+	const handleDeleteResult = async (id, username) => {
+		if (window.confirm(`Ergebnis von "${username}" wirklich löschen?`)) {
+			await deleteQuizResult(id);
+			loadResults();
+		}
 	};
 
-	const handleDeleteAll = () => {
-		Alert.alert('Alle Ergebnisse löschen?', 'Diese Aktion kann nicht rückgängig gemacht werden.', [
-			{ text: 'Abbrechen', style: 'cancel' },
-			{ text: 'Alle löschen', style: 'destructive', onPress: async () => { await deleteAllQuizResults(); loadResults(); } },
-		]);
+	const handleDeleteAll = async () => {
+		if (window.confirm('Alle Ergebnisse löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+			await deleteAllQuizResults();
+			loadResults();
+		}
 	};
 
 	const formatDate = (isoStr) => {
@@ -341,25 +341,14 @@ function QuizManagementTab() {
 		setShowAddQuestion(true);
 	};
 
-	const handleDeleteTopic = (name) => {
-		Alert.alert(
-			'Thema löschen?',
-			`Möchtest du "${name}" und ALLE zugehörigen Fragen wirklich löschen?`,
-			[
-				{ text: 'Abbrechen', style: 'cancel' },
-				{
-					text: 'Löschen',
-					style: 'destructive',
-					onPress: async () => {
-						await deleteQuizByName(name);
-						if (selectedTopic === name) {
-							handleBackToTopics();
-						}
-						loadTopics();
-					},
-				},
-			]
-		);
+	const handleDeleteTopic = async (name) => {
+		if (window.confirm(`"${name}" und ALLE zugehörigen Fragen wirklich löschen?`)) {
+			await deleteQuizByName(name);
+			if (selectedTopic === name) {
+				handleBackToTopics();
+			}
+			loadTopics();
+		}
 	};
 
 	// --- EXPORT / IMPORT ---
@@ -452,19 +441,12 @@ function QuizManagementTab() {
 		}
 	};
 
-	const handleDeleteQuestion = (id, query) => {
-		Alert.alert('Frage löschen?', `"${query}" wirklich löschen?`, [
-			{ text: 'Abbrechen', style: 'cancel' },
-			{
-				text: 'Löschen',
-				style: 'destructive',
-				onPress: async () => {
-					await deleteQuizItem(id);
-					await loadTopicItems(selectedTopic);
-					loadTopics();
-				},
-			},
-		]);
+	const handleDeleteQuestion = async (id, query) => {
+		if (window.confirm(`"${query}" wirklich löschen?`)) {
+			await deleteQuizItem(id);
+			await loadTopicItems(selectedTopic);
+			loadTopics();
+		}
 	};
 
 	const handleStartEdit = (item) => {
