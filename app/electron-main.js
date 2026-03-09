@@ -42,8 +42,8 @@ app.whenReady().then(() => {
 
 		serverApp.use(express.static(distPath));
 
-		// Fallback for SPA routing
-		serverApp.get('*', (req, res) => {
+		// Fallback for SPA routing - using .use() to avoid Express 5 path-to-regexp issues with '*'
+		serverApp.use((req, res) => {
 			res.sendFile(path.join(distPath, 'index.html'));
 		});
 
