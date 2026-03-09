@@ -44,6 +44,9 @@
       "package.json",
       "node_modules/**/*"
     ],
+    "asarUnpack": [
+      "dist/**/*"
+    ],
     "extraMetadata": {
       "main": "electron-main.js"
     },

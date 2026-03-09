@@ -35,7 +35,10 @@ app.whenReady().then(() => {
 	// Start local server for external access (Students)
 	try {
 		const serverApp = express();
-		const distPath = path.join(__dirname, 'dist');
+		const isPackaged = __dirname.includes('app.asar');
+		const distPath = isPackaged
+			? path.join(__dirname.replace('app.asar', 'app.asar.unpacked'), 'dist')
+			: path.join(__dirname, 'dist');
 
 		serverApp.use(express.static(distPath));
 
