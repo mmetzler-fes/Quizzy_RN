@@ -53,14 +53,18 @@ export default function VokabelLearnScreen() {
 		try {
 			const selectedTopics = await getSelectedTopics();
 			let data;
-			if (selectedTopics && selectedTopics.length > 0) {
-				// Load items only from selected topics
-				const allItems = await Promise.all(
-					selectedTopics.map(name => getQuizByName(name))
-				);
-				data = allItems.flat();
+			if (selectedTopics !== null) {
+				if (selectedTopics.length > 0) {
+					// Load items only from selected topics
+					const allItems = await Promise.all(
+						selectedTopics.map(name => getQuizByName(name))
+					);
+					data = allItems.flat();
+				} else {
+					data = [];
+				}
 			} else {
-				// Fallback: load everything
+				// Fallback: load everything (no selection ever made)
 				data = await getAllQuizItems();
 			}
 			setVokabeln(shuffle(data));

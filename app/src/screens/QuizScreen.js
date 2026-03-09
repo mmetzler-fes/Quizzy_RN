@@ -80,12 +80,18 @@ export default function QuizScreen({ route }) {
 		try {
 			const allNames = await getQuizNames();
 			const selectedTopics = await getSelectedTopics();
-			// Filter to selected topics; if none saved or all deselected fall back to all
-			const names = (selectedTopics && selectedTopics.length > 0)
-				? allNames.filter(n => selectedTopics.includes(n))
-				: allNames;
+
+			let names = allNames;
+			if (selectedTopics !== null) {
+				names = allNames.filter(n => selectedTopics.includes(n));
+			}
+
 			setQuizNames(names);
-			if (names.length > 0) selectQuiz(names[0]);
+			if (names.length > 0) {
+				selectQuiz(names[0]);
+			} else {
+				setSelectedQuiz(null);
+			}
 		} catch (e) { console.error(e); } finally { setLoading(false); }
 	};
 

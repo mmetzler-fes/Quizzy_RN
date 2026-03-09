@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { LoadingView, EmptyState } from '../components/UI';
 import { getQuizNames } from '../database/database';
@@ -31,9 +33,11 @@ export default function QuizManageScreen() {
 	const [savedAnim] = useState(new Animated.Value(0));
 	const [showSaved, setShowSaved] = useState(false);
 
-	useEffect(() => {
-		loadData();
-	}, []);
+	useFocusEffect(
+		useCallback(() => {
+			loadData();
+		}, [])
+	);
 
 	const loadData = async () => {
 		try {
