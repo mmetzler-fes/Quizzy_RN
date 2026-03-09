@@ -2,27 +2,32 @@
   "name": "quizzy-rn",
   "version": "1.0.0",
   "main": "index.js",
+  "description": "Quizzy Learning App",
+  "author": "mmetzler",
+  "private": true,
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "electron:web": "expo export --platform web",
-    "electron:start": "npm run electron:web && electron .",
-    "electron:build:linux": "npm run electron:web && electron-builder --linux --publish never",
-    "electron:build:win": "npm run electron:web && electron-builder --win nsis --publish never"
+    "start": "npx expo start",
+    "android": "npx expo start --android",
+    "ios": "npx expo start --ios",
+    "web": "npx expo start --web",
+    "electron:web": "npx -y expo export -p web",
+    "electron:start": "npm run electron:web && npx -y electron .",
+    "electron:build:linux": "npm run electron:web && npx -y electron-builder --linux --publish never",
+    "electron:build:win": "npm run electron:web && npx -y electron-builder --win nsis --publish never"
   },
   "dependencies": {
+    "cors": "^2.8.6",
     "expo": "~55.0.5",
     "expo-status-bar": "~55.0.4",
+    "express": "^5.2.1",
     "react": "19.2.0",
     "react-dom": "^19.2.0",
     "react-native": "0.83.2",
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
-    "electron": "^40.8.0",
-    "electron-builder": "^26.8.1"
+    "electron": "^32.0.1",
+    "electron-builder": "^24.13.3"
   },
   "build": {
     "appId": "com.quizzy.app",
@@ -36,14 +41,22 @@
     },
     "files": [
       "electron-main.js",
+      "server-api.js",
       "dist/**/*",
-      "assets/icon.png"
+      "assets/icon.png",
+      "node_modules/**/*"
+    ],
+    "asarUnpack": [
+      "dist/**/*"
     ],
     "linux": {
       "target": "AppImage",
       "icon": "assets/icon.png",
-      "category": "Game",
-      "executableArgs": ["--no-sandbox"]
+      "category": "Education",
+      "executableArgs": [
+        "--no-sandbox",
+        "--disable-setuid-sandbox"
+      ]
     },
     "win": {
       "target": "nsis",
@@ -53,6 +66,5 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }
-  },
-  "private": true
+  }
 }
