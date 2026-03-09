@@ -1,19 +1,31 @@
-const { app, BrowserWindow, session } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
+
+// --- LINUX SANDBOX FIX (MUST BE AT THE VERY TOP) ---
+if (process.platform === 'linux') {
+  process.env.ELECTRON_DISABLE_SANDBOX = '1';
+
+  if (!process.argv.includes('--no-sandbox')) {
+    // If running as AppImage, use the APPIMAGE env var for the relaunch
+    const executable = process.env.APPIMAGE || process.execPath;
+    const args = [...process.argv.slice(1), '--no-sandbox', '--disable-setuid-sandbox'];
+
+    spawn(executable, args, {
+      stdio: 'inherit',
+      detached: true,
+      env: { ...process.env, ALREADY_RELAUNCHED: '1' }
+    }).unref();
+    process.exit(0);
+  }
+}
+
+const { app, BrowserWindow, session } = require('electron');
 const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const setupApi = require('./server-api');
 
-// --- LINUX SANDBOX FIX (SELF-RELAUNCH) ---
-if (process.platform === 'linux' && !process.argv.includes('--no-sandbox')) {
-  const args = [...process.argv.slice(1), '--no-sandbox', '--disable-setuid-sandbox'];
-  spawn(process.execPath, args, { stdio: 'inherit', detached: true }).unref();
-  app.exit(0);
-}
-
-// Backup switches
+// Backup switches in case relaunch is skipped
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('no-sandbox');
   app.commandLine.appendSwitch('disable-setuid-sandbox');
