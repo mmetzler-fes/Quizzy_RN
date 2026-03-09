@@ -1,9 +1,11 @@
 const { app, BrowserWindow } = require('electron');
 const serve = require('electron-serve').default;
 const express = require('express');
+const cors = require('cors');
 const path = require('path');
+const setupApi = require('./server-api');
 
-// Provide the path to the web build output folder ('dist')
+// Serve handles basic file serving in some electron setups, but we are switching entirely to our Express backend.
 const loadURL = serve({ directory: 'dist' });
 
 let mainWindow;
@@ -20,21 +22,25 @@ function createWindow() {
 		}
 	});
 
-	// Load the web build
-	loadURL(mainWindow);
+	// Load the web app via our internal Express server!
+	mainWindow.loadURL('http://localhost:3000/');
 
 	mainWindow.on('closed', () => {
 		mainWindow = null;
 	});
 }
 
-// When Electron has finished initialization, create window
+// When Electron has finished initialization, start server then window
 app.whenReady().then(() => {
-	createWindow();
-
 	// Start local server for external access (Students)
 	try {
 		const serverApp = express();
+		serverApp.use(cors());
+		serverApp.use(express.json());
+
+		// Initialize our centralized JSON database API
+		setupApi(serverApp, app.getPath('userData'));
+
 		const isPackaged = __dirname.includes('app.asar');
 		const distPath = isPackaged
 			? path.join(__dirname.replace('app.asar', 'app.asar.unpacked'), 'dist')
@@ -49,9 +55,12 @@ app.whenReady().then(() => {
 
 		serverApp.listen(3000, '0.0.0.0', () => {
 			console.log('Local Server running on port 3000 (0.0.0.0)');
+			createWindow();
 		});
 	} catch (err) {
 		console.error('Failed to start local web server:', err);
+		// Still create window to show error or fallback
+		createWindow();
 	}
 });
 
