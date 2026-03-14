@@ -1,64 +1,84 @@
-const { app, BrowserWindow, session } = require('electron');
+const { spawn } = require('child_process');
 const path = require('path');
-const fs = require('fs');
 
-// Fix for Linux AppImage: disable the Chromium sandbox when the SUID helper
-// is not available (common on many distributions without root access).
+// --- LINUX SANDBOX FIX (MUST BE AT THE VERY TOP) ---
 if (process.platform === 'linux') {
-  app.commandLine.appendSwitch('no-sandbox');
+  process.env.ELECTRON_DISABLE_SANDBOX = '1';
+
+  if (!process.argv.includes('--no-sandbox')) {
+    // If running as AppImage, use the APPIMAGE env var for the relaunch
+    const executable = process.env.APPIMAGE || process.execPath;
+    const args = [...process.argv.slice(1), '--no-sandbox', '--disable-setuid-sandbox'];
+
+    spawn(executable, args, {
+      stdio: 'inherit',
+      detached: true,
+      env: { ...process.env, ALREADY_RELAUNCHED: '1' }
+    }).unref();
+    process.exit(0);
+  }
 }
 
+const { app, BrowserWindow, session } = require('electron');
+const fs = require('fs');
+const express = require('express');
+const cors = require('cors');
+const setupApi = require('./server-api');
+
+// Backup switches in case relaunch is skipped
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('no-sandbox');
+  app.commandLine.appendSwitch('disable-setuid-sandbox');
+}
+
+let mainWindow;
+
 function createWindow() {
-  const win = new BrowserWindow({
-    width: 400,
+  mainWindow = new BrowserWindow({
+    width: 1280,
     height: 800,
-    minWidth: 320,
-    minHeight: 600,
-    title: 'Quizzy',
-    icon: path.join(__dirname, 'assets', 'icon.png'),
+    title: "Quizzy App",
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-    },
+    }
   });
 
-  // Apply a Content Security Policy for all responses in this session.
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [
-          "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'",
-        ],
-      },
-    });
+  mainWindow.loadURL('http://localhost:3000/');
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
   });
-
-  const indexPath = path.join(__dirname, 'dist', 'index.html');
-  if (!fs.existsSync(indexPath)) {
-    console.error(
-      `[Quizzy] Web build not found at "${indexPath}".\n` +
-        'Run "npm run electron:web" first to build the web app.'
-    );
-    app.quit();
-    return;
-  }
-
-  win.loadFile(indexPath);
 }
 
 app.whenReady().then(() => {
-  createWindow();
+  try {
+    const serverApp = express();
+    serverApp.use(cors());
+    serverApp.use(express.json());
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    // Database in user data path
+    setupApi(serverApp, app.getPath('userData'));
+
+    const distPath = path.join(__dirname, 'dist');
+    serverApp.use(express.static(distPath));
+
+    // Fallback for SPA routing
+    serverApp.use((req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+
+    serverApp.listen(3000, '0.0.0.0', () => {
+      console.log('Local Server running on port 3000');
       createWindow();
-    }
-  });
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err);
+    createWindow();
+  }
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
