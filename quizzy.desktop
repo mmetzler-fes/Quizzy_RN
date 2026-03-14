@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Quizzy
+Comment=Lerne Vokabeln und mache Quizze
+Exec=/usr/bin/npm start --prefix /home/mmetzler/.gemini/antigravity/scratch/Quizzy_RN
+Icon=/home/mmetzler/.gemini/antigravity/scratch/Quizzy_RN/assets/quizzy_icon.png
+Terminal=false
+Type=Application
+Categories=Education;
+
