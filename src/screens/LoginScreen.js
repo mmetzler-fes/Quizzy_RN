@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import {
 	View,
 	Text,
@@ -17,6 +18,7 @@ import { GradientButton, StyledInput } from '../components/UI';
 const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }) {
+	const isFocused = useIsFocused();
 	const [username, setUsername] = useState('');
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(50)).current;
@@ -24,27 +26,31 @@ export default function LoginScreen({ navigation }) {
 	const glowAnim = useRef(new Animated.Value(0)).current;
 
 	useEffect(() => {
-		Animated.sequence([
-			Animated.parallel([
-				Animated.spring(logoScale, {
-					toValue: 1,
-					friction: 4,
-					tension: 40,
+		if (isFocused) {
+			Animated.sequence([
+				Animated.parallel([
+					Animated.spring(logoScale, {
+						toValue: 1,
+						friction: 4,
+						tension: 40,
+						useNativeDriver: true,
+					}),
+					Animated.timing(fadeAnim, {
+						toValue: 1,
+						duration: 800,
+						useNativeDriver: true,
+					}),
+				]),
+				Animated.timing(slideAnim, {
+					toValue: 0,
+					duration: 500,
 					useNativeDriver: true,
 				}),
-				Animated.timing(fadeAnim, {
-					toValue: 1,
-					duration: 800,
-					useNativeDriver: true,
-				}),
-			]),
-			Animated.timing(slideAnim, {
-				toValue: 0,
-				duration: 500,
-				useNativeDriver: true,
-			}),
-		]).start();
+			]).start();
+		}
+	}, [isFocused]);
 
+	useEffect(() => {
 		// Pulsing glow animation
 		Animated.loop(
 			Animated.sequence([
@@ -75,6 +81,7 @@ export default function LoginScreen({ navigation }) {
 		>
 			<KeyboardAvoidingView
 				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				enabled={Platform.OS !== 'web'}
 				style={{ flex: 1 }}
 			>
 				<ScrollView
@@ -83,8 +90,14 @@ export default function LoginScreen({ navigation }) {
 					keyboardShouldPersistTaps="handled"
 				>
 					{/* Decorative circles */}
-					<Animated.View style={[styles.decorCircle1, { opacity: glowAnim }]} />
-					<Animated.View style={[styles.decorCircle2, { opacity: Animated.subtract(1, glowAnim) }]} />
+					<Animated.View 
+						pointerEvents="none" 
+						style={[styles.decorCircle1, { opacity: glowAnim }]} 
+					/>
+					<Animated.View 
+						pointerEvents="none" 
+						style={[styles.decorCircle2, { opacity: Animated.subtract(1, glowAnim) }]} 
+					/>
 
 					{/* Logo */}
 					<Animated.View
@@ -217,6 +230,7 @@ const styles = StyleSheet.create({
 	formContainer: {
 		width: '100%',
 		maxWidth: 400,
+		zIndex: 10,
 	},
 	formCard: {
 		backgroundColor: COLORS.surface,
