@@ -11,8 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { Card, GradientButton, Badge, LoadingView, EmptyState } from '../components/UI';
-import { getAllQuizItems, getQuizByName, getQuizNames } from '../database/database';
-import { getSelectedTopics } from './QuizManageScreen';
+import { getAllQuizItems, getQuizByName, getQuizNames, getSelectedTopics } from '../database/database';
 
 function shuffle(array) {
 	const arr = [...array];
@@ -53,15 +52,18 @@ export default function VokabelLearnScreen() {
 		try {
 			const selectedTopics = await getSelectedTopics();
 			let data;
-			if (selectedTopics && selectedTopics.length > 0) {
+			if (selectedTopics === null) {
+				// Fallback: load everything on first run
+				data = await getAllQuizItems();
+			} else if (selectedTopics.length > 0) {
 				// Load items only from selected topics
 				const allItems = await Promise.all(
 					selectedTopics.map(name => getQuizByName(name))
 				);
 				data = allItems.flat();
 			} else {
-				// Fallback: load everything
-				data = await getAllQuizItems();
+				// Explicitly none selected
+				data = [];
 			}
 			setVokabeln(shuffle(data));
 		} catch (error) {

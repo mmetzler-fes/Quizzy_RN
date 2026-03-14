@@ -54,6 +54,9 @@ export default function QuizScreen({ route }) {
 	const [activeHover, setActiveHover] = useState(null);
 	const [draggingTermIdx, setDraggingTermIdx] = useState(null); // termIdx in shuffledTerms
 
+	const [dynTermWidth, setDynTermWidth] = useState(140);
+	const [dynDropWidth, setDynDropWidth] = useState(150);
+
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const ghostX = useRef(new Animated.Value(0)).current;
 	const ghostY = useRef(new Animated.Value(0)).current;
@@ -64,9 +67,8 @@ export default function QuizScreen({ route }) {
 	const dropRefs = useRef({}); // descIdx → DOM element
 
 	// ── data ─────────────────────────────────────────────
-	// Reload whenever this tab gets focus → picks up topic selection changes
 	useFocusEffect(
-		useCallback(() => { loadQuizNames(); }, [])
+		useCallback(() => { loadQuizNames(); }, [selectedQuiz])
 	);
 	useEffect(() => {
 		Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
@@ -76,13 +78,29 @@ export default function QuizScreen({ route }) {
 		try {
 			const allNames = await getQuizNames();
 			const selectedTopics = await getSelectedTopics();
-			// Filter to selected topics; if none saved or all deselected fall back to all
-			const names = (selectedTopics && selectedTopics.length > 0)
-				? allNames.filter(n => selectedTopics.includes(n))
-				: allNames;
+			let names;
+			if (selectedTopics === null) {
+				names = allNames;
+			} else {
+				// Filter to selected topics (could be empty [])
+				names = allNames.filter(n => selectedTopics.includes(n));
+			}
 			setQuizNames(names);
-			if (names.length > 0) selectQuiz(names[0]);
-		} catch (e) { console.error(e); } finally { setLoading(false); }
+
+			// If current selection is invalid or none yet:
+			// Auto-select if exactly one is marked, otherwise show list
+			if (!selectedQuiz || !names.includes(selectedQuiz)) {
+				if (names.length === 1) {
+					await selectQuiz(names[0]);
+				} else {
+					setSelectedQuiz(null);
+				}
+			}
+		} catch (e) {
+			console.error(e);
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	const selectQuiz = async (name) => {
@@ -96,8 +114,20 @@ export default function QuizScreen({ route }) {
 			setUserAnswers({});
 			setSubmitted(false);
 			setScore(null);
+			setDynTermWidth(140); // reset to min
+			setDynDropWidth(150); // reset to min
 			fadeAnim.setValue(0);
 		} catch (e) { console.error(e); } finally { setLoading(false); }
+	};
+
+	const onTermLayout = (e) => {
+		const w = e.nativeEvent.layout.width;
+		if (w > dynTermWidth) setDynTermWidth(w + 10);
+	};
+
+	const onDropZoneLayout = (e) => {
+		const w = e.nativeEvent.layout.width;
+		if (w > dynDropWidth) setDynDropWidth(w + 10);
 	};
 
 	// ── mouse drag handlers ───────────────────────────────
@@ -160,7 +190,7 @@ export default function QuizScreen({ route }) {
 		if (rootRef.current)
 			rootRef.current.measureInWindow((x, y) => { rootOrigin.current = { x, y }; });
 		const co = rootOrigin.current;
-		ghostX.setValue(e.clientX - co.x - COL_TERM_W / 2);
+		ghostX.setValue(e.clientX - co.x - dynTermWidth / 2);
 		ghostY.setValue(e.clientY - co.y - 20);
 		isDragging.current = true;
 		dragTermIdx.current = termIdx;
@@ -298,10 +328,10 @@ export default function QuizScreen({ route }) {
 
 					{/* Column headers */}
 					<View style={styles.colHeaders}>
-						<View style={{ width: COL_TERM_W }}>
+						<View style={{ width: dynTermWidth }}>
 							<Text style={styles.colHeaderText}>BEGRIFFE</Text>
 						</View>
-						<View style={{ width: COL_DROP_W, alignItems: 'center' }}>
+						<View style={{ width: dynDropWidth, alignItems: 'center' }}>
 							<Text style={styles.colHeaderText}>ZUORDNUNG</Text>
 						</View>
 						<View style={{ flex: 1, paddingHorizontal: 8 }}>
@@ -326,10 +356,12 @@ export default function QuizScreen({ route }) {
 									<View
 										style={[
 											styles.termChip,
+											{ width: dynTermWidth - 16 },
 											isBeingDragged && styles.termChipActive,
 											isPlaced && styles.termChipPlaced,
 										]}
 										onMouseDown={(e) => handleTermMouseDown(descIdx, e)}
+										onLayout={onTermLayout}
 									>
 										<View style={styles.chipBadge}>
 											<Text style={styles.chipBadgeText}>{descIdx + 1}</Text>
@@ -340,11 +372,13 @@ export default function QuizScreen({ route }) {
 									</View>
 
 									{/* CENTER: drop zone */}
-									<View style={styles.dropCol}>
+									<View style={[styles.dropCol, { width: dynDropWidth }]}>
 										<View
 											ref={el => { dropRefs.current[descIdx] = el; }}
+											onLayout={onDropZoneLayout}
 											style={[
 												styles.dropZone,
+												{ width: dynDropWidth - 16 },
 												placed !== undefined && styles.dropZoneFilled,
 												activeHover === descIdx && styles.dropZoneHover,
 											]}
@@ -354,7 +388,7 @@ export default function QuizScreen({ route }) {
 													<View style={styles.dropZoneBadge}>
 														<Text style={styles.dropZoneBadgeText}>{placed + 1}</Text>
 													</View>
-													<Text style={styles.dropZoneFilledText} numberOfLines={2}>
+													<Text style={[styles.dropZoneFilledText, { flex: 1 }]} numberOfLines={2}>
 														{shuffledTerms[placed]?.query}
 													</Text>
 													<TouchableOpacity
@@ -394,7 +428,7 @@ export default function QuizScreen({ route }) {
 							style={[
 								styles.termChip,
 								styles.termChipGhost,
-								{ position: 'absolute', left: ghostX, top: ghostY },
+								{ position: 'absolute', left: ghostX, top: ghostY, width: dynTermWidth },
 							]}
 						>
 							<View style={styles.chipBadge}>
@@ -443,7 +477,6 @@ const styles = StyleSheet.create({
 
 	// term chip (left)
 	termChip: {
-		width: COL_TERM_W - 16,
 		flexDirection: 'row', alignItems: 'center',
 		backgroundColor: COLORS.surface,
 		paddingVertical: 8, paddingHorizontal: 8,
@@ -465,7 +498,6 @@ const styles = StyleSheet.create({
 		borderColor: COLORS.accent,
 		backgroundColor: COLORS.surface,
 		cursor: 'grabbing',
-		width: COL_TERM_W,
 		...SHADOWS.md,
 	},
 	chipBadge: {
@@ -477,12 +509,11 @@ const styles = StyleSheet.create({
 
 	// drop zone column (center)
 	dropCol: {
-		width: COL_DROP_W,
 		alignItems: 'center', justifyContent: 'center',
 		paddingVertical: 6, paddingHorizontal: 4,
 	},
 	dropZone: {
-		width: COL_DROP_W - 16, minHeight: 50, borderRadius: 10, borderWidth: 2,
+		minHeight: 50, borderRadius: 10, borderWidth: 2,
 		borderStyle: 'dashed', borderColor: COLORS.primary + '50',
 		backgroundColor: COLORS.background,
 		alignItems: 'center', justifyContent: 'center',
