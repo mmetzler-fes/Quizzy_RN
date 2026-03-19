@@ -13,6 +13,7 @@ import { COLORS, FONTS, SPACING, RADIUS } from './src/styles/theme';
 import LoginScreen from './src/screens/LoginScreen';
 import QuizScreen from './src/screens/QuizScreen';
 import QuizManageScreen from './src/screens/QuizManageScreen';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 import VokabelLearnScreen from './src/screens/VokabelLearnScreen';
 import AdminScreen from './src/screens/AdminScreen';
@@ -21,12 +22,14 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function TabIcon({ emoji, label, focused }) {
+  const { colors } = useTheme();
+
   return (
-    <View style={[tabStyles.tabItem, focused && tabStyles.tabItemActive]}>
+    <View style={[tabStyles.tabItem, focused && { backgroundColor: colors.primary + '20' }]}>
       <Text style={[tabStyles.tabEmoji, focused && tabStyles.tabEmojiActive]}>
         {emoji}
       </Text>
-      <Text style={[tabStyles.tabLabel, focused && tabStyles.tabLabelActive]}>
+      <Text style={[tabStyles.tabLabel, focused && { color: colors.primaryLight, fontWeight: FONTS.weights.bold }, !focused && { color: colors.textMuted }]}>
         {label}
       </Text>
     </View>
@@ -37,6 +40,7 @@ function MainTabs({ route }) {
   const username = route?.params?.username || 'Spieler';
   const [isExamMode, setIsExamMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { colors } = useTheme();
 
   useEffect(() => {
     async function checkExamMode() {
@@ -60,7 +64,7 @@ function MainTabs({ route }) {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: tabStyles.tabBar,
+        tabBarStyle: [tabStyles.tabBar, { backgroundColor: colors.surface, borderTopColor: colors.border }],
         tabBarShowLabel: false,
         tabBarHideOnKeyboard: true,
       }}
@@ -117,8 +121,9 @@ function MainTabs({ route }) {
   );
 }
 
-export default function App() {
+function AppContent() {
   const [dbReady, setDbReady] = useState(false);
+  const { colors, isDark } = useTheme();
 
   useEffect(() => {
     async function init() {
@@ -138,12 +143,12 @@ export default function App() {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       <NavigationContainer>
         <Stack.Navigator
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: COLORS.background },
+            contentStyle: { backgroundColor: colors.background },
             animation: 'fade',
           }}
         >
@@ -153,6 +158,14 @@ export default function App() {
         </Stack.Navigator>
       </NavigationContainer>
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 

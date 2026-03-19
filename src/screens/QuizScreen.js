@@ -9,8 +9,9 @@ import {
 	Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SHADOWS } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
-import { COLORS, SHADOWS } from '../styles/theme';
 import { GradientButton, Card, LoadingView, EmptyState, Badge } from '../components/UI';
 import { getQuizByName, getQuizNames, saveQuizResult, getSelectedTopics, getExamMode, getTeacherTopics } from '../database/database';
 
@@ -40,6 +41,8 @@ const ROW_MIN_H = 64;
 //   Correct when: shuffledTerms[termIdx].id === shuffledDescs[descIdx].id
 //
 export default function QuizScreen({ route }) {
+	const { colors, isDark } = useTheme();
+	const styles = useStyles(colors);
 	const username = route?.params?.username || 'Spieler';
 
 	const [quizNames, setQuizNames] = useState([]);
@@ -239,11 +242,11 @@ export default function QuizScreen({ route }) {
 	// ── guards ────────────────────────────────────────────
 	if (examFinished) {
 		return (
-			<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
+			<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
 					<Text style={{ fontSize: 64, marginBottom: 20 }}>🏁</Text>
-					<Text style={{ fontSize: 24, color: COLORS.textPrimary, fontWeight: 'bold' }}>Prüfung beendet!</Text>
-					<Text style={{ fontSize: 16, color: COLORS.textSecondary, marginTop: 10 }}>Alle Themen wurden durchlaufen.</Text>
+					<Text style={{ fontSize: 24, color: colors.textPrimary, fontWeight: 'bold' }}>Prüfung beendet!</Text>
+					<Text style={{ fontSize: 16, color: colors.textSecondary, marginTop: 10 }}>Alle Themen wurden durchlaufen.</Text>
 				</View>
 			</LinearGradient>
 		);
@@ -264,14 +267,14 @@ export default function QuizScreen({ route }) {
 		const isPerfect = score === quizData.length;
 		const isGood = pct >= 70;
 		return (
-			<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
+			<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 				<ScrollView contentContainerStyle={styles.resultContainer}>
 					<Animated.View style={{ opacity: fadeAnim, alignItems: 'center' }}>
 						<Text style={styles.resultEmoji}>{isPerfect ? '🏆' : isGood ? '👏' : '💪'}</Text>
 						<Text style={styles.resultTitle}>{isPerfect ? 'Perfekt!' : isGood ? 'Gut gemacht!' : 'Weiter üben!'}</Text>
 						<Text style={styles.resultSubtitle}>{username}, du hast {score} von {quizData.length} richtig!</Text>
-						<View style={[styles.scoreCircle, { borderColor: isPerfect ? COLORS.success : isGood ? COLORS.accent : COLORS.error }]}>
-							<Text style={[styles.scorePercentage, { color: isPerfect ? COLORS.success : isGood ? COLORS.accent : COLORS.error }]}>{pct}%</Text>
+						<View style={[styles.scoreCircle, { borderColor: isPerfect ? colors.success : isGood ? colors.accent : colors.error }]}>
+							<Text style={[styles.scorePercentage, { color: isPerfect ? colors.success : isGood ? colors.accent : colors.error }]}>{pct}%</Text>
 						</View>
 						<Card style={styles.detailCard}>
 							<Text style={styles.detailTitle}>📋 Übersicht</Text>
@@ -280,11 +283,11 @@ export default function QuizScreen({ route }) {
 								const termItem = shuffledTerms[termIdx];
 								const ok = termItem?.id === descItem.id;
 								return (
-									<View key={descIdx} style={[styles.detailRow, { borderLeftColor: ok ? COLORS.success : COLORS.error }]}>
+									<View key={descIdx} style={[styles.detailRow, { borderLeftColor: ok ? colors.success : colors.error }]}>
 										<Text style={styles.detailAnswer}>{descItem.answer}</Text>
 										<View style={styles.detailTermRow}>
 											<Text style={styles.detailTermLabel}>Deine Wahl:</Text>
-											<Text style={[styles.detailTermValue, { color: ok ? COLORS.success : COLORS.error }]}>
+											<Text style={[styles.detailTermValue, { color: ok ? colors.success : colors.error }]}>
 												{termItem?.query ?? '?'}
 											</Text>
 										</View>
@@ -320,7 +323,7 @@ export default function QuizScreen({ route }) {
 	// ── quiz select view ──────────────────────────────────
 	if (!selectedQuiz) {
 		return (
-			<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
+			<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 				<ScrollView contentContainerStyle={styles.selectContainer}>
 					<Text style={styles.selectTitle}>Quiz auswählen</Text>
 					{quizNames.map(name => (
@@ -342,7 +345,7 @@ export default function QuizScreen({ route }) {
 	// Per row:  [shuffledTerms[i].query chip]  [Drop Zone (center)]  [shuffledDescs[i].answer]
 	//
 	return (
-		<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
+		<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 			<View ref={rootRef} style={{ flex: 1 }} onLayout={onRootLayout}>
 				<Animated.View style={{ flex: 1, opacity: fadeAnim }}>
 
@@ -354,7 +357,7 @@ export default function QuizScreen({ route }) {
 					<Text style={styles.quizTitle}>Zuordnungs-Quiz</Text>
 					<Text style={styles.quizInstruction}>
 						Ziehe den Begriff auf das{' '}
-						<Text style={{ color: COLORS.accent }}>?</Text>
+						<Text style={{ color: colors.accent }}>?</Text>
 						{' '}neben der passenden Beschreibung.
 					</Text>
 
@@ -479,65 +482,65 @@ export default function QuizScreen({ route }) {
 }
 
 // ─── styles ───────────────────────────────────────────────
-const styles = StyleSheet.create({
+const useStyles = (colors) => StyleSheet.create({
 	container: { flex: 1 },
 
 	header: {
 		flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
 		paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4,
 	},
-	headerUser: { color: COLORS.textSecondary, fontWeight: '500', fontSize: 12 },
-	quizTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.textPrimary, paddingHorizontal: 16, marginTop: 4 },
-	quizInstruction: { color: COLORS.textMuted, fontSize: 12, paddingHorizontal: 16, marginBottom: 8 },
+	headerUser: { color: colors.textSecondary, fontWeight: '500', fontSize: 12 },
+	quizTitle: { fontSize: 20, fontWeight: 'bold', color: colors.textPrimary, paddingHorizontal: 16, marginTop: 4 },
+	quizInstruction: { color: colors.textMuted, fontSize: 12, paddingHorizontal: 16, marginBottom: 8 },
 
 	colHeaders: {
 		flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 6,
-		borderBottomWidth: 1, borderBottomColor: COLORS.border,
+		borderBottomWidth: 1, borderBottomColor: colors.border,
 		backgroundColor: 'rgba(255,255,255,0.04)',
 	},
 	colHeaderText: {
-		color: COLORS.primaryLight, fontSize: 9, fontWeight: 'bold',
+		color: colors.primaryLight, fontSize: 9, fontWeight: 'bold',
 		letterSpacing: 1, textTransform: 'uppercase',
 	},
 
 	// rows
 	row: {
 		flexDirection: 'row', alignItems: 'center', minHeight: ROW_MIN_H,
-		paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border + '20',
+		paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: colors.border + '20',
 	},
 	rowAlt: { backgroundColor: 'rgba(255,255,255,0.025)' },
 
 	// term chip (left)
 	termChip: {
 		flexDirection: 'row', alignItems: 'center',
-		backgroundColor: COLORS.surface,
+		backgroundColor: colors.surface,
 		paddingVertical: 8, paddingHorizontal: 8,
-		borderRadius: 8, borderWidth: 1.5, borderColor: COLORS.primary + '55',
+		borderRadius: 8, borderWidth: 1.5, borderColor: colors.primary + '55',
 		cursor: 'grab',
 		...SHADOWS.sm,
 	},
 	termChipActive: {
-		borderColor: COLORS.accent,
-		backgroundColor: COLORS.accent + '15',
+		borderColor: colors.accent,
+		backgroundColor: colors.accent + '15',
 		cursor: 'grabbing',
 	},
 	termChipPlaced: {
 		opacity: 0.4,
-		borderColor: COLORS.success + '60',
+		borderColor: colors.success + '60',
 	},
 	termChipGhost: {
 		zIndex: 9999, opacity: 0.92,
-		borderColor: COLORS.accent,
-		backgroundColor: COLORS.surface,
+		borderColor: colors.accent,
+		backgroundColor: colors.surface,
 		cursor: 'grabbing',
 		...SHADOWS.md,
 	},
 	chipBadge: {
-		width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.primary,
+		width: 20, height: 20, borderRadius: 10, backgroundColor: colors.primary,
 		alignItems: 'center', justifyContent: 'center', marginRight: 6, flexShrink: 0,
 	},
-	chipBadgeText: { color: COLORS.white, fontSize: 10, fontWeight: 'bold' },
-	chipLabel: { color: COLORS.textPrimary, fontSize: 11, fontWeight: '600', flex: 1 },
+	chipBadgeText: { color: colors.white, fontSize: 10, fontWeight: 'bold' },
+	chipLabel: { color: colors.textPrimary, fontSize: 11, fontWeight: '600', flex: 1 },
 
 	// drop zone column (center)
 	dropCol: {
@@ -546,60 +549,60 @@ const styles = StyleSheet.create({
 	},
 	dropZone: {
 		minHeight: 50, borderRadius: 10, borderWidth: 2,
-		borderStyle: 'dashed', borderColor: COLORS.primary + '50',
-		backgroundColor: COLORS.background,
+		borderStyle: 'dashed', borderColor: colors.primary + '50',
+		backgroundColor: colors.background,
 		alignItems: 'center', justifyContent: 'center',
 		paddingHorizontal: 6, paddingVertical: 4,
 	},
 	dropZoneFilled: {
-		borderStyle: 'solid', borderColor: COLORS.success,
-		backgroundColor: COLORS.success + '12',
+		borderStyle: 'solid', borderColor: colors.success,
+		backgroundColor: colors.success + '12',
 	},
 	dropZoneHover: {
-		borderColor: COLORS.accent, backgroundColor: COLORS.accent + '25',
+		borderColor: colors.accent, backgroundColor: colors.accent + '25',
 		transform: [{ scale: 1.04 }],
 	},
-	dropZoneQMark: { color: COLORS.primary + '80', fontSize: 22, fontWeight: 'bold' },
+	dropZoneQMark: { color: colors.primary + '80', fontSize: 22, fontWeight: 'bold' },
 	dropZoneContent: { flexDirection: 'row', alignItems: 'center', width: '100%' },
 	dropZoneBadge: {
-		width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.success,
+		width: 20, height: 20, borderRadius: 10, backgroundColor: colors.success,
 		alignItems: 'center', justifyContent: 'center', marginRight: 5, flexShrink: 0,
 	},
-	dropZoneBadgeText: { color: COLORS.white, fontSize: 10, fontWeight: 'bold' },
-	dropZoneFilledText: { color: COLORS.textPrimary, fontSize: 11, fontWeight: '600', flex: 1 },
+	dropZoneBadgeText: { color: colors.white, fontSize: 10, fontWeight: 'bold' },
+	dropZoneFilledText: { color: colors.textPrimary, fontSize: 11, fontWeight: '600', flex: 1 },
 	clearBtn: { paddingLeft: 4, flexShrink: 0 },
-	clearBtnText: { color: COLORS.error, fontSize: 14 },
+	clearBtnText: { color: colors.error, fontSize: 14 },
 
-	descText: { color: COLORS.textSecondary, fontSize: 12, lineHeight: 16 },
+	descText: { color: colors.textSecondary, fontSize: 12, lineHeight: 16 },
 
 	submitButton: { marginTop: 20, marginHorizontal: 16 },
 
 	// quiz select
 	selectContainer: { padding: 24, paddingTop: 40 },
-	selectTitle: { fontSize: 28, fontWeight: 'bold', color: COLORS.textPrimary, marginBottom: 24 },
+	selectTitle: { fontSize: 28, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 24 },
 	quizCard: { marginBottom: 12 },
 	quizCardContent: { flexDirection: 'row', alignItems: 'center' },
 	quizCardEmoji: { fontSize: 24 },
-	quizCardTitle: { fontSize: 18, fontWeight: '600', color: COLORS.textPrimary },
-	quizCardArrow: { fontSize: 20, color: COLORS.primary },
+	quizCardTitle: { fontSize: 18, fontWeight: '600', color: colors.textPrimary },
+	quizCardArrow: { fontSize: 20, color: colors.primary },
 
 	// result
 	resultContainer: { padding: 24, alignItems: 'center' },
 	resultEmoji: { fontSize: 56, marginBottom: 12 },
-	resultTitle: { fontSize: 28, fontWeight: 'bold', color: COLORS.textPrimary },
-	resultSubtitle: { fontSize: 16, color: COLORS.textSecondary, marginBottom: 20 },
+	resultTitle: { fontSize: 28, fontWeight: 'bold', color: colors.textPrimary },
+	resultSubtitle: { fontSize: 16, color: colors.textSecondary, marginBottom: 20 },
 	scoreCircle: {
 		width: 90, height: 90, borderRadius: 45, borderWidth: 3,
-		alignItems: 'center', justifyContent: 'center', marginBottom: 20, backgroundColor: COLORS.surface,
+		alignItems: 'center', justifyContent: 'center', marginBottom: 20, backgroundColor: colors.surface,
 	},
 	scorePercentage: { fontSize: 24, fontWeight: 'bold' },
 	detailCard: { width: '100%' },
-	detailTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.textPrimary, marginBottom: 12 },
+	detailTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 12 },
 	detailRow: { borderLeftWidth: 3, paddingLeft: 10, marginBottom: 12 },
-	detailAnswer: { fontSize: 14, color: COLORS.textPrimary, fontWeight: '500' },
+	detailAnswer: { fontSize: 14, color: colors.textPrimary, fontWeight: '500' },
 	detailTermRow: { flexDirection: 'row', marginTop: 2 },
-	detailTermLabel: { fontSize: 12, color: COLORS.textSecondary, marginRight: 4 },
+	detailTermLabel: { fontSize: 12, color: colors.textSecondary, marginRight: 4 },
 	detailTermValue: { fontSize: 12, fontWeight: 'bold' },
-	detailCorrection: { fontSize: 11, color: COLORS.error, marginTop: 2 },
+	detailCorrection: { fontSize: 11, color: colors.error, marginTop: 2 },
 	buttonRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
 });

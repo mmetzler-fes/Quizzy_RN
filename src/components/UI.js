@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 
 // === GRADIENT BUTTON ===
 export function GradientButton({
@@ -21,11 +22,12 @@ export function GradientButton({
 	icon,
 	variant = 'primary', // 'primary', 'success', 'error', 'accent'
 }) {
+	const { colors } = useTheme();
 	const gradients = {
-		primary: [COLORS.primary, '#8B5CF6'],
-		success: [COLORS.success, '#34D399'],
-		error: [COLORS.error, '#F87171'],
-		accent: [COLORS.accent, '#FBBF24'],
+		primary: [colors.primary, '#8B5CF6'],
+		success: [colors.success, '#34D399'],
+		error: [colors.error, '#F87171'],
+		accent: [colors.accent, '#FBBF24'],
 	};
 
 	return (
@@ -36,13 +38,13 @@ export function GradientButton({
 			style={[styles.buttonWrapper, disabled && styles.buttonDisabled, style]}
 		>
 			<LinearGradient
-				colors={disabled ? [COLORS.surfaceLight, COLORS.surfaceLight] : gradients[variant]}
+				colors={disabled ? [colors.surfaceLight, colors.surfaceLight] : gradients[variant]}
 				start={{ x: 0, y: 0 }}
 				end={{ x: 1, y: 1 }}
 				style={styles.gradientButton}
 			>
 				{icon && <View style={{ marginRight: SPACING.sm }}>{icon}</View>}
-				<Text style={[styles.buttonText, textStyle]}>{title}</Text>
+				<Text style={[styles.buttonText, { color: disabled ? colors.textMuted : colors.white }, textStyle]}>{title}</Text>
 			</LinearGradient>
 		</TouchableOpacity>
 	);
@@ -50,12 +52,13 @@ export function GradientButton({
 
 // === CARD ===
 export function Card({ children, style, onPress }) {
+	const { colors } = useTheme();
 	const Wrapper = onPress ? TouchableOpacity : View;
 	return (
 		<Wrapper
 			onPress={onPress}
 			activeOpacity={0.85}
-			style={[styles.card, style]}
+			style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, style]}
 		>
 			{children}
 		</Wrapper>
@@ -72,17 +75,19 @@ export function StyledInput({
 	multiline = false,
 	...props
 }) {
+	const { colors } = useTheme();
 	return (
 		<View style={[styles.inputContainer, style]}>
-			{label && <Text style={styles.inputLabel}>{label}</Text>}
+			{label && <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>{label}</Text>}
 			<TextInput
 				placeholder={placeholder}
-				placeholderTextColor={COLORS.textMuted}
+				placeholderTextColor={colors.textMuted}
 				value={value}
 				onChangeText={onChangeText}
 				multiline={multiline}
 				style={[
 					styles.input,
+					{ backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary },
 					multiline && { height: 100, textAlignVertical: 'top' },
 				]}
 				{...props}
@@ -93,17 +98,18 @@ export function StyledInput({
 
 // === BADGE ===
 export function Badge({ text, variant = 'primary', style }) {
+	const { colors } = useTheme();
 	const bgColors = {
-		primary: COLORS.primarySoft,
-		success: COLORS.successLight,
-		error: COLORS.errorLight,
+		primary: colors.primarySoft,
+		success: colors.successLight,
+		error: colors.errorLight,
 		accent: '#FEF3C7',
 	};
 	const textColors = {
-		primary: COLORS.primaryDark,
+		primary: colors.primaryDark,
 		success: '#065F46',
-		error: COLORS.errorDark,
-		accent: COLORS.accentDark,
+		error: colors.errorDark,
+		accent: colors.accentDark,
 	};
 
 	return (
@@ -115,32 +121,36 @@ export function Badge({ text, variant = 'primary', style }) {
 
 // === EMPTY STATE ===
 export function EmptyState({ icon, title, subtitle }) {
+	const { colors } = useTheme();
 	return (
 		<View style={styles.emptyState}>
 			{icon && <Text style={styles.emptyIcon}>{icon}</Text>}
-			<Text style={styles.emptyTitle}>{title}</Text>
-			{subtitle && <Text style={styles.emptySubtitle}>{subtitle}</Text>}
+			<Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>{title}</Text>
+			{subtitle && <Text style={[styles.emptySubtitle, { color: colors.textMuted }]}>{subtitle}</Text>}
 		</View>
 	);
 }
 
 // === LOADING ===
 export function LoadingView({ message = 'Laden...' }) {
+	const { colors } = useTheme();
 	return (
-		<View style={styles.loadingContainer}>
-			<ActivityIndicator size="large" color={COLORS.primary} />
-			<Text style={styles.loadingText}>{message}</Text>
+		<View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+			<ActivityIndicator size="large" color={colors.primary} />
+			<Text style={[styles.loadingText, { color: colors.textSecondary }]}>{message}</Text>
 		</View>
 	);
 }
 
 // === STATS CARD ===
-export function StatsCard({ icon, value, label, color = COLORS.primary }) {
+export function StatsCard({ icon, value, label, color }) {
+	const { colors } = useTheme();
+	const activeColor = color || colors.primary;
 	return (
-		<View style={[styles.statsCard, { borderLeftColor: color }]}>
+		<View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border, borderLeftColor: activeColor }]}>
 			<Text style={styles.statsIcon}>{icon}</Text>
-			<Text style={[styles.statsValue, { color }]}>{value}</Text>
-			<Text style={styles.statsLabel}>{label}</Text>
+			<Text style={[styles.statsValue, { color: activeColor }]}>{value}</Text>
+			<Text style={[styles.statsLabel, { color: colors.textMuted }]}>{label}</Text>
 		</View>
 	);
 }

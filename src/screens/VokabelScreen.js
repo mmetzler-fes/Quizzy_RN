@@ -10,7 +10,8 @@ import {
 	TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 import {
 	GradientButton,
 	Card,
@@ -25,6 +26,8 @@ import {
 } from '../database/database';
 
 export default function VokabelScreen() {
+	const { colors, isDark } = useTheme();
+	const styles = useStyles(colors);
 	const [vokabeln, setVokabeln] = useState([]);
 	const [allItems, setAllItems] = useState([]);
 	const [loading, setLoading] = useState(true);
@@ -143,7 +146,7 @@ export default function VokabelScreen() {
 	);
 
 	return (
-		<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
+		<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 			{/* Header area */}
 			<View style={styles.header}>
 				<View>
@@ -157,7 +160,7 @@ export default function VokabelScreen() {
 				<TextInput
 					style={styles.searchInput}
 					placeholder="🔍  Suchen..."
-					placeholderTextColor={COLORS.textMuted}
+					placeholderTextColor={colors.textMuted}
 					value={searchText}
 					onChangeText={handleSearch}
 				/>
@@ -166,7 +169,7 @@ export default function VokabelScreen() {
 					onPress={() => setShowForm(!showForm)}
 				>
 					<LinearGradient
-						colors={showForm ? [COLORS.error, '#F87171'] : [COLORS.primary, '#8B5CF6']}
+						colors={showForm ? [colors.error, '#F87171'] : [colors.primary, '#8B5CF6']}
 						style={styles.addToggleGradient}
 					>
 						<Text style={styles.addToggleText}>{showForm ? '✕' : '+'}</Text>
@@ -223,7 +226,7 @@ export default function VokabelScreen() {
 	);
 }
 
-const styles = StyleSheet.create({
+const useStyles = (colors) => StyleSheet.create({
 	container: {
 		flex: 1,
 	},
@@ -237,11 +240,11 @@ const styles = StyleSheet.create({
 	headerTitle: {
 		fontSize: FONTS.sizes.xxl,
 		fontWeight: FONTS.weights.bold,
-		color: COLORS.textPrimary,
+		color: colors.textPrimary,
 	},
 	headerCount: {
 		fontSize: FONTS.sizes.sm,
-		color: COLORS.textMuted,
+		color: colors.textMuted,
 		marginTop: 2,
 	},
 
@@ -256,14 +259,14 @@ const styles = StyleSheet.create({
 	},
 	searchInput: {
 		flex: 1,
-		backgroundColor: COLORS.surface,
+		backgroundColor: colors.surface,
 		borderWidth: 1,
-		borderColor: COLORS.border,
+		borderColor: colors.border,
 		borderRadius: RADIUS.full,
 		paddingHorizontal: SPACING.xl,
 		paddingVertical: SPACING.md,
 		fontSize: FONTS.sizes.md,
-		color: COLORS.textPrimary,
+		color: colors.textPrimary,
 	},
 	addToggle: {
 		borderRadius: RADIUS.full,
@@ -277,7 +280,7 @@ const styles = StyleSheet.create({
 		justifyContent: 'center',
 	},
 	addToggleText: {
-		color: COLORS.white,
+		color: colors.white,
 		fontSize: FONTS.sizes.xxl,
 		fontWeight: FONTS.weights.bold,
 	},
@@ -294,7 +297,7 @@ const styles = StyleSheet.create({
 	formTitle: {
 		fontSize: FONTS.sizes.lg,
 		fontWeight: FONTS.weights.bold,
-		color: COLORS.textPrimary,
+		color: colors.textPrimary,
 		marginBottom: SPACING.lg,
 	},
 
@@ -306,12 +309,12 @@ const styles = StyleSheet.create({
 	},
 	listItem: {
 		flexDirection: 'row',
-		backgroundColor: COLORS.surface,
+		backgroundColor: colors.surface,
 		borderRadius: RADIUS.md,
 		padding: SPACING.md,
 		marginBottom: SPACING.sm,
 		borderWidth: 1,
-		borderColor: COLORS.border,
+		borderColor: colors.border,
 		alignItems: 'center',
 	},
 	listItemLeft: {
@@ -321,12 +324,12 @@ const styles = StyleSheet.create({
 		width: 32,
 		height: 32,
 		borderRadius: 16,
-		backgroundColor: COLORS.primary + '25',
+		backgroundColor: colors.primary + '25',
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
 	indexText: {
-		color: COLORS.primaryLight,
+		color: colors.primaryLight,
 		fontSize: FONTS.sizes.sm,
 		fontWeight: FONTS.weights.bold,
 	},
@@ -336,7 +339,7 @@ const styles = StyleSheet.create({
 	listItemName: {
 		fontSize: FONTS.sizes.md,
 		fontWeight: FONTS.weights.semiBold,
-		color: COLORS.textPrimary,
+		color: colors.textPrimary,
 		marginBottom: 4,
 	},
 	listItemBottom: {
@@ -345,12 +348,12 @@ const styles = StyleSheet.create({
 	},
 	listItemLang: {
 		fontSize: FONTS.sizes.xs,
-		color: COLORS.textMuted,
+		color: colors.textMuted,
 		marginRight: SPACING.sm,
 	},
 	listItemVokabel: {
 		fontSize: FONTS.sizes.sm,
-		color: COLORS.primaryLight,
+		color: colors.primaryLight,
 		fontWeight: FONTS.weights.medium,
 	},
 	deleteButton: {

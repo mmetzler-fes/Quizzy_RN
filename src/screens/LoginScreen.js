@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 import { GradientButton, StyledInput } from '../components/UI';
 
 const { width, height } = Dimensions.get('window');
@@ -20,6 +21,7 @@ const { width, height } = Dimensions.get('window');
 export default function LoginScreen({ navigation }) {
 	const isFocused = useIsFocused();
 	const [username, setUsername] = useState('');
+	const { colors, isDark, toggleTheme } = useTheme();
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(50)).current;
 	const logoScale = useRef(new Animated.Value(0.5)).current;
@@ -76,7 +78,10 @@ export default function LoginScreen({ navigation }) {
 
 	return (
 		<LinearGradient
-			colors={[COLORS.background, '#1a1040', COLORS.background]}
+			colors={isDark 
+				? [colors.background, '#1a1040', colors.background] 
+				: [colors.background, colors.primarySoft, colors.background]
+			}
 			style={styles.container}
 		>
 			<KeyboardAvoidingView
@@ -89,10 +94,18 @@ export default function LoginScreen({ navigation }) {
 					showsVerticalScrollIndicator={false}
 					keyboardShouldPersistTaps="handled"
 				>
+					{/* Theme Toggle Button */}
+					<TouchableOpacity
+						style={{ position: 'absolute', top: 50, right: 30, zIndex: 100, padding: 10, backgroundColor: colors.surfaceLight, borderRadius: 20 }}
+						onPress={toggleTheme}
+					>
+						<Text style={{ fontSize: 24 }}>{isDark ? '☀️' : '🌙'}</Text>
+					</TouchableOpacity>
+
 					{/* Decorative circles */}
 					<Animated.View 
 						pointerEvents="none" 
-						style={[styles.decorCircle1, { opacity: glowAnim }]} 
+						style={[styles.decorCircle1, { opacity: glowAnim, backgroundColor: colors.primary }]} 
 					/>
 					<Animated.View 
 						pointerEvents="none" 
@@ -110,13 +123,13 @@ export default function LoginScreen({ navigation }) {
 						]}
 					>
 						<LinearGradient
-							colors={[COLORS.primary, '#8B5CF6']}
+							colors={[colors.primary, '#8B5CF6']}
 							style={styles.logoGradient}
 						>
 							<Text style={styles.logoEmoji}>🧠</Text>
 						</LinearGradient>
-						<Text style={styles.title}>Quizzy</Text>
-						<Text style={styles.subtitle}>Lerne smarter, nicht härter</Text>
+						<Text style={[styles.title, { color: colors.textPrimary }]}>Quizzy</Text>
+						<Text style={[styles.subtitle, { color: colors.textSecondary }]}>Lerne smarter, nicht härter</Text>
 					</Animated.View>
 
 					{/* Login Form */}
@@ -129,9 +142,9 @@ export default function LoginScreen({ navigation }) {
 							},
 						]}
 					>
-						<View style={styles.formCard}>
-							<Text style={styles.welcomeText}>Willkommen!</Text>
-							<Text style={styles.instructionText}>
+						<View style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+							<Text style={[styles.welcomeText, { color: colors.textPrimary }]}>Willkommen!</Text>
+							<Text style={[styles.instructionText, { color: colors.textMuted }]}>
 								Gib deinen Namen ein, um loszulegen
 							</Text>
 
@@ -152,13 +165,13 @@ export default function LoginScreen({ navigation }) {
 								style={styles.loginButton}
 							/>
 
-							<View style={styles.divider} />
+							<View style={[styles.divider, { backgroundColor: colors.border }]} />
 
 							<TouchableOpacity
 								onPress={() => navigation.navigate('Admin')}
-								style={styles.adminLink}
+								style={[styles.adminLink, { borderColor: colors.error + '40', backgroundColor: colors.error + '10' }]}
 							>
-								<Text style={styles.adminLinkText}>🔐 Zum Lehrer-Bereich</Text>
+								<Text style={[styles.adminLinkText, { color: colors.error }]}>🔐 Zum Lehrer-Bereich</Text>
 							</TouchableOpacity>
 						</View>
 					</Animated.View>
