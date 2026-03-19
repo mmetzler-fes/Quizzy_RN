@@ -172,7 +172,7 @@ export default function QuizManageScreen() {
 	);
 }
 
-const useStyles = (colors) => StyleSheet.create({
+function useStyles(colors) { return StyleSheet.create({
 	container: { flex: 1 },
 
 	header: {
@@ -285,3 +285,4 @@ const useStyles = (colors) => StyleSheet.create({
 		fontSize: FONTS.sizes.sm,
 	},
 });
+}

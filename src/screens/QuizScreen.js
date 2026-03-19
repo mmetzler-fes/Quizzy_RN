@@ -62,34 +62,31 @@ export default function QuizScreen({ route }) {
 
 	const [dynTermWidth, setDynTermWidth] = useState(140);
 	const [dynDropWidth, setDynDropWidth] = useState(150);
-
-	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const ghostX = useRef(new Animated.Value(0)).current;
 	const ghostY = useRef(new Animated.Value(0)).current;
 	const rootRef = useRef(null);
 	const rootOrigin = useRef({ x: 0, y: 0 });
 	const isDragging = useRef(false);
 	const dragTermIdx = useRef(null);
-	const dropRefs = useRef({}); // descIdx → DOM element
+	const dropRefs = useRef({});
 
 	// ── data ─────────────────────────────────────────────
 	useFocusEffect(
 		useCallback(() => { loadQuizNames(); }, [])
 	);
-	useEffect(() => {
-		Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
-	}, [selectedQuiz, submitted]);
 
 	const loadQuizNames = async () => {
 		try {
 			const teacherTopics = await getTeacherTopics();
-			const studentTopics = await getSelectedTopics();
 			const mode = await getExamMode();
 			setIsExamMode(mode);
 
-			let names = teacherTopics; // Fallback: all teacher-allowed topics
-			if (studentTopics && studentTopics.length > 0) {
-				names = teacherTopics.filter(n => studentTopics.includes(n));
+			let names = teacherTopics;
+			if (!mode) {
+				const studentTopics = await getSelectedTopics();
+				if (studentTopics && studentTopics.length > 0) {
+					names = teacherTopics.filter(n => studentTopics.includes(n));
+				}
 			}
 			setQuizNames(names);
 
@@ -107,7 +104,7 @@ export default function QuizScreen({ route }) {
 				}
 			}
 		} catch (e) {
-			console.error(e);
+			console.error('Error in loadQuizNames:', e);
 		} finally {
 			setLoading(false);
 		}
@@ -126,7 +123,6 @@ export default function QuizScreen({ route }) {
 			setScore(null);
 			setDynTermWidth(140); // reset to min
 			setDynDropWidth(150); // reset to min
-			fadeAnim.setValue(0);
 		} catch (e) { console.error(e); } finally { setLoading(false); }
 	};
 
@@ -140,8 +136,25 @@ export default function QuizScreen({ route }) {
 		if (w > dynDropWidth) setDynDropWidth(w + 10);
 	};
 
+	const updateRootOrigin = () => {
+		const currentRoot = rootRef.current;
+		if (!currentRoot) return;
+
+		if (typeof currentRoot.measureInWindow === 'function') {
+			currentRoot.measureInWindow((x, y) => { rootOrigin.current = { x, y }; });
+			return;
+		}
+
+		if (typeof currentRoot.getBoundingClientRect === 'function') {
+			const rect = currentRoot.getBoundingClientRect();
+			rootOrigin.current = { x: rect.left, y: rect.top };
+		}
+	};
+
 	// ── mouse drag handlers ───────────────────────────────
 	useEffect(() => {
+		if (typeof document === 'undefined') return undefined;
+
 		const hitTest = (cx, cy) => {
 			for (const [key, el] of Object.entries(dropRefs.current)) {
 				if (!el) continue;
@@ -189,16 +202,13 @@ export default function QuizScreen({ route }) {
 	}, []);
 
 	const onRootLayout = () => {
-		if (rootRef.current) {
-			rootRef.current.measureInWindow((x, y) => { rootOrigin.current = { x, y }; });
-		}
+		updateRootOrigin();
 	};
 
 	const handleTermMouseDown = (termIdx, e) => {
 		if (submitted) return;
 		e.preventDefault();
-		if (rootRef.current)
-			rootRef.current.measureInWindow((x, y) => { rootOrigin.current = { x, y }; });
+		updateRootOrigin();
 		const co = rootOrigin.current;
 		ghostX.setValue(e.clientX - co.x - dynTermWidth / 2);
 		ghostY.setValue(e.clientY - co.y - 20);
@@ -231,7 +241,6 @@ export default function QuizScreen({ route }) {
 		});
 		setScore(correct);
 		setSubmitted(true);
-		fadeAnim.setValue(0);
 		try { await saveQuizResult(username, selectedQuiz, correct, quizData.length, details); }
 		catch (e) { console.error(e); }
 	};
@@ -256,7 +265,10 @@ export default function QuizScreen({ route }) {
 		return (
 			<View style={styles.container}>
 				<EmptyState icon="📝" title="Keine Quizze vorhanden"
-					subtitle="Füge zuerst Quiz-Fragen im Verwaltungsbereich hinzu." />
+					subtitle={isExamMode
+						? "Der Lehrer muss im Lehrer-Bereich mindestens ein Thema für die Prüfung aktivieren."
+						: "Füge zuerst Quiz-Fragen im Verwaltungsbereich hinzu."
+					} />
 			</View>
 		);
 	}
@@ -269,7 +281,7 @@ export default function QuizScreen({ route }) {
 		return (
 			<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 				<ScrollView contentContainerStyle={styles.resultContainer}>
-					<Animated.View style={{ opacity: fadeAnim, alignItems: 'center' }}>
+					<View style={{ alignItems: 'center' }}>
 						<Text style={styles.resultEmoji}>{isPerfect ? '🏆' : isGood ? '👏' : '💪'}</Text>
 						<Text style={styles.resultTitle}>{isPerfect ? 'Perfekt!' : isGood ? 'Gut gemacht!' : 'Weiter üben!'}</Text>
 						<Text style={styles.resultSubtitle}>{username}, du hast {score} von {quizData.length} richtig!</Text>
@@ -314,7 +326,7 @@ export default function QuizScreen({ route }) {
 								<GradientButton title="📋  Anderes Quiz" onPress={() => { setSelectedQuiz(null); setSubmitted(false); }} variant="accent" style={{ flex: 1 }} />
 							</View>
 						)}
-					</Animated.View>
+					</View>
 				</ScrollView>
 			</LinearGradient>
 		);
@@ -347,7 +359,7 @@ export default function QuizScreen({ route }) {
 	return (
 		<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 			<View ref={rootRef} style={{ flex: 1 }} onLayout={onRootLayout}>
-				<Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+				<View style={{ flex: 1 }}>
 
 					{/* Header */}
 					<View style={styles.header}>
@@ -475,14 +487,14 @@ export default function QuizScreen({ route }) {
 						</Animated.View>
 					)}
 
-				</Animated.View>
+				</View>
 			</View>
 		</LinearGradient>
 	);
 }
 
 // ─── styles ───────────────────────────────────────────────
-const useStyles = (colors) => StyleSheet.create({
+function useStyles(colors) { return StyleSheet.create({
 	container: { flex: 1 },
 
 	header: {
@@ -606,3 +618,4 @@ const useStyles = (colors) => StyleSheet.create({
 	detailCorrection: { fontSize: 11, color: colors.error, marginTop: 2 },
 	buttonRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
 });
+}

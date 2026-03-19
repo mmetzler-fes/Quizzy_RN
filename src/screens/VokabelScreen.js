@@ -226,7 +226,7 @@ export default function VokabelScreen() {
 	);
 }
 
-const useStyles = (colors) => StyleSheet.create({
+function useStyles(colors) { return StyleSheet.create({
 	container: {
 		flex: 1,
 	},
@@ -364,3 +364,4 @@ const useStyles = (colors) => StyleSheet.create({
 		fontSize: 20,
 	},
 });
+}

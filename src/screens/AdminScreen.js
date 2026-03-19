@@ -31,13 +31,15 @@ import {
 	updateAdminPassword,
 	getQuizNames,
 	getQuizByName,
-	saveQuizItem,
+	addQuizItem,
+	updateQuizItem,
 	deleteQuizItem,
 	deleteQuizByName,
 	getExamMode,
 	setExamMode,
 	getTeacherTopics,
 	setTeacherTopics,
+	setSelectedTopics,
 } from '../database/database';
 
 // ============================================================
@@ -417,25 +419,28 @@ function QuizManagementTab() {
 					try {
 						const data = JSON.parse(event.target.result);
 
-						// Support new hierarchical format OR fallback to old array formatting just in case
-						if (data && data.quizname && Array.isArray(data.items)) {
+						const quizName = data.quizname || data.title || data.name || data.thema || 'Importiertes Quiz';
+						const itemsArray = data.items || data.questions || data.data || data.vokabeln || (Array.isArray(data) ? data : null);
+
+						if (itemsArray && Array.isArray(itemsArray)) {
 							let importCount = 0;
-							for (const item of data.items) {
-								if (item.query && item.answer) {
-									await addQuizItem(data.quizname, item.query, item.answer);
+							for (const item of itemsArray) {
+								const q = item.query || item.question || item.Frage || item.frage || item.term || item.q;
+								const a = item.answer || item.Antwort || item.antwort || item.definition || item.a;
+								
+								const qName = item.quizname || item.thema || quizName;
+
+								if (q && a) {
+									await addQuizItem(qName, String(q), String(a));
 									importCount++;
 								}
 							}
-							Alert.alert('Erfolg', `Thema "${data.quizname}" mit ${importCount} Fragen wurde importiert.`);
-						} else if (Array.isArray(data)) {
-							let importCount = 0;
-							for (const item of data) {
-								if (item.quizname && item.query && item.answer) {
-									await addQuizItem(item.quizname, item.query, item.answer);
-									importCount++;
-								}
+							
+							if (importCount > 0) {
+								Alert.alert('Erfolg', `${importCount} Fragen wurden importiert.`);
+							} else {
+								Alert.alert('Fehler', 'Die JSON-Datei enthielt keine erkennbaren Fragen/Antworten.');
 							}
-							Alert.alert('Erfolg', `${importCount} Fragen wurden importiert.`);
 						} else {
 							throw new Error('Format ungültig');
 						}
@@ -729,6 +734,9 @@ function QuizManagementTab() {
 						const nextMode = !examMode;
 						setExamModeState(nextMode);
 						await setExamMode(nextMode);
+						if (nextMode) {
+							await setSelectedTopics(activeTopics);
+						}
 					}}
 				>
 					<Text style={{ fontSize: 28 }}>{examMode ? '☑️' : '◻️'}</Text>
@@ -756,6 +764,9 @@ function QuizManagementTab() {
 										const newActive = isActive ? activeTopics.filter(t => t !== name) : [...activeTopics, name];
 										setActiveTopics(newActive);
 										await setTeacherTopics(newActive);
+										if (examMode) {
+											await setSelectedTopics(newActive);
+										}
 									}}
 								>
 									<Text style={{ fontSize: 24, paddingBottom: 4 }}>{isActive ? '☑️' : '◻️'}</Text>
@@ -921,7 +932,7 @@ export default function AdminScreen({ navigation }) {
 // ============================================================
 // STYLES
 // ============================================================
-const useStyles = (colors) => StyleSheet.create({
+function useStyles(colors) { return StyleSheet.create({
 	container: { flex: 1 },
 
 	// === LOGIN ===
@@ -1069,3 +1080,4 @@ const useStyles = (colors) => StyleSheet.create({
 	// Edit
 	editButtonRow: { flexDirection: 'row', marginTop: SPACING.md },
 });
+}

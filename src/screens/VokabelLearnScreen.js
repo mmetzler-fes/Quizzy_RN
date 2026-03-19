@@ -10,6 +10,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
+import { useFocusEffect } from '@react-navigation/native';
 import { Card, GradientButton, Badge, LoadingView, EmptyState } from '../components/UI';
 import { getAllQuizItems, getQuizByName, getQuizNames, getSelectedTopics, getTeacherTopics } from '../database/database';
 
@@ -270,7 +271,7 @@ export default function VokabelLearnScreen() {
 	);
 }
 
-const useStyles = (colors) => StyleSheet.create({
+function useStyles(colors) { return StyleSheet.create({
 	container: {
 		flex: 1,
 	},
@@ -428,3 +429,4 @@ const useStyles = (colors) => StyleSheet.create({
 		marginTop: SPACING.xs,
 	},
 });
+}
