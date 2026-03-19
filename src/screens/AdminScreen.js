@@ -30,10 +30,13 @@ import {
 	updateAdminPassword,
 	getQuizNames,
 	getQuizByName,
-	addQuizItem,
+	saveQuizItem,
 	deleteQuizItem,
-	updateQuizItem,
 	deleteQuizByName,
+	getExamMode,
+	setExamMode,
+	getTeacherTopics,
+	setTeacherTopics,
 } from '../database/database';
 
 // ============================================================
@@ -271,6 +274,8 @@ function ResultsTab() {
 // ============================================================
 function QuizManagementTab() {
 	const [quizNames, setQuizNames] = useState([]);
+	const [activeTopics, setActiveTopics] = useState([]);
+	const [examMode, setExamModeState] = useState(false);
 	const [selectedTopic, setSelectedTopic] = useState(null);
 	const [topicItems, setTopicItems] = useState([]);
 	const [loading, setLoading] = useState(true);
@@ -291,7 +296,11 @@ function QuizManagementTab() {
 		setLoading(true);
 		try {
 			const names = await getQuizNames();
+			const active = await getTeacherTopics();
+			const exam = await getExamMode();
 			setQuizNames(names);
+			setActiveTopics(active || []);
+			setExamModeState(exam || false);
 		} catch (error) {
 			console.error('Error loading topics:', error);
 		} finally {
@@ -684,6 +693,26 @@ function QuizManagementTab() {
 				</Card>
 			)}
 
+			{/* EXAM MODE TOGGLE */}
+			<Card style={{ marginBottom: SPACING.md, flexDirection: 'row', alignItems: 'center', backgroundColor: examMode ? COLORS.primary + '15' : COLORS.surface, borderColor: examMode ? COLORS.primary : COLORS.border, borderWidth: 1 }}>
+				<View style={{ flex: 1 }}>
+					<Text style={{ fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary }}>🎓 Prüfungsmodus</Text>
+					<Text style={{ color: COLORS.textSecondary, fontSize: FONTS.sizes.xs, marginTop: 4 }}>
+						Schüler sehen nur "Quiz", und aktive Themen werden strikt nacheinander abgefragt.
+					</Text>
+				</View>
+				<TouchableOpacity
+					style={{ padding: SPACING.sm, marginLeft: SPACING.md }}
+					onPress={async () => {
+						const nextMode = !examMode;
+						setExamModeState(nextMode);
+						await setExamMode(nextMode);
+					}}
+				>
+					<Text style={{ fontSize: 28 }}>{examMode ? '☑️' : '◻️'}</Text>
+				</TouchableOpacity>
+			</Card>
+
 			{/* Topics list */}
 			{quizNames.length === 0 ? (
 				<EmptyState
@@ -692,10 +721,24 @@ function QuizManagementTab() {
 					subtitle="Erstelle dein erstes Themengebiet mit dem Button oben."
 				/>
 			) : (
-				quizNames.map((name) => (
+				quizNames.map((name) => {
+					const isActive = activeTopics.includes(name);
+					return (
 					<TouchableOpacity key={name} onPress={() => handleSelectTopic(name)} activeOpacity={0.7}>
 						<Card style={styles.topicCard}>
 							<View style={styles.topicCardContent}>
+								{/* Checkbox */}
+								<TouchableOpacity
+									style={{ padding: SPACING.sm, marginRight: SPACING.sm }}
+									onPress={async () => {
+										const newActive = isActive ? activeTopics.filter(t => t !== name) : [...activeTopics, name];
+										setActiveTopics(newActive);
+										await setTeacherTopics(newActive);
+									}}
+								>
+									<Text style={{ fontSize: 24, paddingBottom: 4 }}>{isActive ? '☑️' : '◻️'}</Text>
+								</TouchableOpacity>
+
 								<View style={styles.topicCardIcon}>
 									<Text style={styles.topicCardEmoji}>📚</Text>
 								</View>
@@ -714,7 +757,8 @@ function QuizManagementTab() {
 							</View>
 						</Card>
 					</TouchableOpacity>
-				))
+					);
+				})
 			)}
 		</>
 	);

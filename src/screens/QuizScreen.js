@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SHADOWS } from '../styles/theme';
 import { GradientButton, Card, LoadingView, EmptyState, Badge } from '../components/UI';
-import { getQuizByName, getQuizNames, saveQuizResult, getSelectedTopics } from '../database/database';
+import { getQuizByName, getQuizNames, saveQuizResult, getSelectedTopics, getExamMode, getTeacherTopics } from '../database/database';
 
 function shuffle(array) {
 	const arr = [...array];
@@ -53,6 +53,9 @@ export default function QuizScreen({ route }) {
 	const [loading, setLoading] = useState(true);
 	const [activeHover, setActiveHover] = useState(null);
 	const [draggingTermIdx, setDraggingTermIdx] = useState(null); // termIdx in shuffledTerms
+	const [isExamMode, setIsExamMode] = useState(false);
+	const [currentExamTopicIndex, setCurrentExamTopicIndex] = useState(0);
+	const [examFinished, setExamFinished] = useState(false);
 
 	const [dynTermWidth, setDynTermWidth] = useState(140);
 	const [dynDropWidth, setDynDropWidth] = useState(150);
@@ -68,7 +71,7 @@ export default function QuizScreen({ route }) {
 
 	// ── data ─────────────────────────────────────────────
 	useFocusEffect(
-		useCallback(() => { loadQuizNames(); }, [selectedQuiz])
+		useCallback(() => { loadQuizNames(); }, [])
 	);
 	useEffect(() => {
 		Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
@@ -76,20 +79,24 @@ export default function QuizScreen({ route }) {
 
 	const loadQuizNames = async () => {
 		try {
-			const allNames = await getQuizNames();
-			const selectedTopics = await getSelectedTopics();
-			let names;
-			if (selectedTopics === null) {
-				names = allNames;
-			} else {
-				// Filter to selected topics (could be empty [])
-				names = allNames.filter(n => selectedTopics.includes(n));
+			const teacherTopics = await getTeacherTopics();
+			const studentTopics = await getSelectedTopics();
+			const mode = await getExamMode();
+			setIsExamMode(mode);
+
+			let names = teacherTopics; // Fallback: all teacher-allowed topics
+			if (studentTopics && studentTopics.length > 0) {
+				names = teacherTopics.filter(n => studentTopics.includes(n));
 			}
 			setQuizNames(names);
 
-			// If current selection is invalid or none yet:
-			// Auto-select if exactly one is marked, otherwise show list
-			if (!selectedQuiz || !names.includes(selectedQuiz)) {
+			if (mode && names.length > 0) {
+				// Start exam with the first topic, ONLY if no valid quiz is selected yet
+				if (!selectedQuiz || !names.includes(selectedQuiz)) {
+					setCurrentExamTopicIndex(0);
+					await selectQuiz(names[0]);
+				}
+			} else if (!selectedQuiz || !names.includes(selectedQuiz)) {
 				if (names.length === 1) {
 					await selectQuiz(names[0]);
 				} else {
@@ -230,6 +237,17 @@ export default function QuizScreen({ route }) {
 	const placedTermIndices = new Set(Object.values(userAnswers));
 
 	// ── guards ────────────────────────────────────────────
+	if (examFinished) {
+		return (
+			<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
+				<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+					<Text style={{ fontSize: 64, marginBottom: 20 }}>🏁</Text>
+					<Text style={{ fontSize: 24, color: COLORS.textPrimary, fontWeight: 'bold' }}>Prüfung beendet!</Text>
+					<Text style={{ fontSize: 16, color: COLORS.textSecondary, marginTop: 10 }}>Alle Themen wurden durchlaufen.</Text>
+				</View>
+			</LinearGradient>
+		);
+	}
 	if (loading) return <LoadingView message="Quiz wird geladen..." />;
 	if (quizNames.length === 0) {
 		return (
@@ -275,10 +293,24 @@ export default function QuizScreen({ route }) {
 								);
 							})}
 						</Card>
-						<View style={styles.buttonRow}>
-							<GradientButton title="🔄  Nochmal" onPress={() => selectQuiz(selectedQuiz)} variant="primary" style={{ flex: 1 }} />
-							<GradientButton title="📋  Anderes Quiz" onPress={() => { setSelectedQuiz(null); setSubmitted(false); }} variant="accent" style={{ flex: 1 }} />
-						</View>
+						{isExamMode ? (
+							<View style={styles.buttonRow}>
+								{currentExamTopicIndex < quizNames.length - 1 ? (
+									<GradientButton title="Nächstes Thema →" onPress={() => {
+										const nextIdx = currentExamTopicIndex + 1;
+										setCurrentExamTopicIndex(nextIdx);
+										selectQuiz(quizNames[nextIdx]);
+									}} variant="primary" style={{ flex: 1 }} />
+								) : (
+									<GradientButton title="🏁 Prüfung beenden" onPress={() => setExamFinished(true)} variant="success" style={{ flex: 1 }} />
+								)}
+							</View>
+						) : (
+							<View style={styles.buttonRow}>
+								<GradientButton title="🔄  Nochmal" onPress={() => selectQuiz(selectedQuiz)} variant="primary" style={{ flex: 1 }} />
+								<GradientButton title="📋  Anderes Quiz" onPress={() => { setSelectedQuiz(null); setSubmitted(false); }} variant="accent" style={{ flex: 1 }} />
+							</View>
+						)}
 					</Animated.View>
 				</ScrollView>
 			</LinearGradient>

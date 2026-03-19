@@ -6,6 +6,7 @@
   "author": "mmetzler",
   "private": true,
   "scripts": {
+    "api": "node run-server.js",
     "start": "npx -y expo start",
     "android": "npx -y expo start --android",
     "ios": "npx -y expo start --ios",

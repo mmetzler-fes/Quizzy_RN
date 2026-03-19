@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { LoadingView, EmptyState } from '../components/UI';
-import { getQuizNames, getSelectedTopics, setSelectedTopics } from '../database/database';
+import { getQuizNames, getSelectedTopics, setSelectedTopics, getTeacherTopics } from '../database/database';
 
 export default function QuizManageScreen() {
 	const [allTopics, setAllTopics] = useState([]);
@@ -26,15 +26,18 @@ export default function QuizManageScreen() {
 
 	const loadData = async () => {
 		try {
-			const topics = await getQuizNames();
-			setAllTopics(topics);
+			// The only topics a student can choose from are the ones the teacher allowed
+			const teacherTopics = await getTeacherTopics();
+			const availableTopics = teacherTopics;
+			setAllTopics(availableTopics);
 
-			// Load saved selection; if none saved → select all by default
+			// Load saved selection; if none saved → select all allowed by default
 			const topicsFromApi = await getSelectedTopics();
-			if (topicsFromApi) {
-				setSelected(new Set(topicsFromApi));
+			if (topicsFromApi && topicsFromApi.length > 0) {
+				const valid = topicsFromApi.filter(t => availableTopics.includes(t));
+				setSelected(new Set(valid));
 			} else {
-				setSelected(new Set(topics)); // all selected by default
+				setSelected(new Set(availableTopics)); 
 			}
 		} catch (e) {
 			console.error(e);

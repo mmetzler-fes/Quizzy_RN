@@ -6,7 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { initDatabase } from './src/database/database';
+import { initDatabase, getExamMode } from './src/database/database';
 import { LoadingView } from './src/components/UI';
 import { COLORS, FONTS, SPACING, RADIUS } from './src/styles/theme';
 
@@ -35,6 +35,26 @@ function TabIcon({ emoji, label, focused }) {
 
 function MainTabs({ route }) {
   const username = route?.params?.username || 'Spieler';
+  const [isExamMode, setIsExamMode] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function checkExamMode() {
+      try {
+        const mode = await getExamMode();
+        setIsExamMode(mode);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    checkExamMode();
+  }, []);
+
+  if (loading) {
+    return <LoadingView message="Struktur wird geladen..." />;
+  }
 
   return (
     <Tab.Navigator
@@ -55,25 +75,29 @@ function MainTabs({ route }) {
           ),
         }}
       />
-      <Tab.Screen
-        name="QuizVerwalten"
-        component={QuizManageScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="📋" label="Verwalten" focused={focused} />
-          ),
-        }}
-      />
+      {!isExamMode && (
+        <Tab.Screen
+          name="QuizVerwalten"
+          component={QuizManageScreen}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon emoji="📋" label="Verwalten" focused={focused} />
+            ),
+          }}
+        />
+      )}
 
-      <Tab.Screen
-        name="VokabelLernen"
-        component={VokabelLearnScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="🎓" label="Lernen" focused={focused} />
-          ),
-        }}
-      />
+      {!isExamMode && (
+        <Tab.Screen
+          name="VokabelLernen"
+          component={VokabelLearnScreen}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon emoji="🎓" label="Lernen" focused={focused} />
+            ),
+          }}
+        />
+      )}
       <Tab.Screen
         name="Abmelden"
         component={View}
