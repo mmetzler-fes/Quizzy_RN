@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 module.exports = function setupApi(app, userDataPath) {
 	const dbPath = path.join(userDataPath, 'quizzy_database.json');
@@ -202,5 +203,44 @@ module.exports = function setupApi(app, userDataPath) {
 		db.results = [];
 		writeDB(db);
 		res.json({ success: true });
+	});
+
+	app.get('/api/networkInfo', (req, res) => {
+		const interfaces = os.networkInterfaces();
+		const wifiNamePattern = /(wi-?fi|wlan|wireless|^wl|^en0$)/i;
+		const isPrivateIPv4 = (ip) => {
+			if (!ip || typeof ip !== 'string') return false;
+			if (ip.startsWith('10.')) return true;
+			if (ip.startsWith('192.168.')) return true;
+			const parts = ip.split('.').map((p) => parseInt(p, 10));
+			if (parts.length !== 4 || Number.isNaN(parts[0]) || Number.isNaN(parts[1])) return false;
+			return parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31;
+		};
+
+		const allExternalIps = Object.entries(interfaces)
+			.flatMap(([, addresses]) =>
+				(addresses || [])
+					.filter((addr) => addr.family === 'IPv4' && !addr.internal)
+					.map((addr) => addr.address)
+			);
+
+		const wifiIps = Object.entries(interfaces)
+			.filter(([name]) => wifiNamePattern.test(name))
+			.flatMap(([, addresses]) =>
+				(addresses || [])
+					.filter((addr) => addr.family === 'IPv4' && !addr.internal)
+					.map((addr) => addr.address)
+			);
+
+		const uniqueWifiIps = [...new Set(wifiIps)];
+		const uniquePrivateLanIps = [...new Set(allExternalIps.filter((ip) => isPrivateIPv4(ip) && !uniqueWifiIps.includes(ip)))];
+		const prioritizedIps = [...uniqueWifiIps, ...uniquePrivateLanIps];
+		res.json({
+			wifiAvailable: uniqueWifiIps.length > 0,
+			wifiIps: uniqueWifiIps,
+			privateLanIps: uniquePrivateLanIps,
+			ips: prioritizedIps,
+			urls: prioritizedIps.map((ip) => `http://${ip}:3000`),
+		});
 	});
 };

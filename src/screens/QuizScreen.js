@@ -5,8 +5,8 @@ import {
 	ScrollView,
 	TouchableOpacity,
 	StyleSheet,
-	Animated,
 	Alert,
+	Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SHADOWS } from '../styles/theme';
@@ -25,8 +25,6 @@ function shuffle(array) {
 }
 
 // ─── constants ───────────────────────────────────────────
-const COL_TERM_W = 140; // left: term chips
-const COL_DROP_W = 150; // center: drop zones
 const ROW_MIN_H = 64;
 
 // ─── QuizScreen ──────────────────────────────────────────
@@ -56,19 +54,16 @@ export default function QuizScreen({ route }) {
 	const [loading, setLoading] = useState(true);
 	const [activeHover, setActiveHover] = useState(null);
 	const [draggingTermIdx, setDraggingTermIdx] = useState(null); // termIdx in shuffledTerms
+	const [selectedTermIdx, setSelectedTermIdx] = useState(null);
 	const [isExamMode, setIsExamMode] = useState(false);
 	const [currentExamTopicIndex, setCurrentExamTopicIndex] = useState(0);
 	const [examFinished, setExamFinished] = useState(false);
 
 	const [dynTermWidth, setDynTermWidth] = useState(140);
 	const [dynDropWidth, setDynDropWidth] = useState(150);
-	const ghostX = useRef(new Animated.Value(0)).current;
-	const ghostY = useRef(new Animated.Value(0)).current;
-	const rootRef = useRef(null);
-	const rootOrigin = useRef({ x: 0, y: 0 });
-	const isDragging = useRef(false);
 	const dragTermIdx = useRef(null);
-	const dropRefs = useRef({});
+	const selectedTermIdxRef = useRef(null);
+	const assignRef = useRef(null);
 
 	// ── data ─────────────────────────────────────────────
 	useFocusEffect(
@@ -119,6 +114,7 @@ export default function QuizScreen({ route }) {
 			setShuffledDescs(shuffle(data));  // independent shuffle for right column
 			setSelectedQuiz(name);
 			setUserAnswers({});
+			setSelectedTermIdx(null);
 			setSubmitted(false);
 			setScore(null);
 			setDynTermWidth(140); // reset to min
@@ -136,86 +132,109 @@ export default function QuizScreen({ route }) {
 		if (w > dynDropWidth) setDynDropWidth(w + 10);
 	};
 
-	const updateRootOrigin = () => {
-		const currentRoot = rootRef.current;
-		if (!currentRoot) return;
-
-		if (typeof currentRoot.measureInWindow === 'function') {
-			currentRoot.measureInWindow((x, y) => { rootOrigin.current = { x, y }; });
-			return;
-		}
-
-		if (typeof currentRoot.getBoundingClientRect === 'function') {
-			const rect = currentRoot.getBoundingClientRect();
-			rootOrigin.current = { x: rect.left, y: rect.top };
-		}
+	const assignTermToDropZone = (termIdx, dropIdx) => {
+		if (termIdx === null || termIdx === undefined || dropIdx === null || dropIdx === undefined) return;
+		setUserAnswers(prev => {
+			const next = {};
+			Object.entries(prev).forEach(([k, v]) => { if (v !== termIdx) next[k] = v; });
+			next[dropIdx] = termIdx;
+			return next;
+		});
 	};
 
-	// ── mouse drag handlers ───────────────────────────────
-	useEffect(() => {
-		if (typeof document === 'undefined') return undefined;
+	// keep refs in sync so DOM callbacks always see latest values
+	useEffect(() => { selectedTermIdxRef.current = selectedTermIdx; }, [selectedTermIdx]);
+	useEffect(() => { assignRef.current = assignTermToDropZone; });
 
-		const hitTest = (cx, cy) => {
-			for (const [key, el] of Object.entries(dropRefs.current)) {
-				if (!el) continue;
-				const r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
-				if (!r) continue;
-				if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom)
-					return parseInt(key);
-			}
-			return -1;
-		};
-
-		const onMouseMove = (e) => {
-			if (!isDragging.current) return;
-			const co = rootOrigin.current;
-			ghostX.setValue(e.clientX - co.x - COL_TERM_W / 2);
-			ghostY.setValue(e.clientY - co.y - 20);
-			const hit = hitTest(e.clientX, e.clientY);
-			setActiveHover(hit >= 0 ? hit : null);
-		};
-
-		const onMouseUp = (e) => {
-			if (!isDragging.current) return;
-			const hit = hitTest(e.clientX, e.clientY);
-			const tIdx = dragTermIdx.current;
-			if (hit !== -1 && tIdx !== null) {
-				setUserAnswers(prev => {
-					const next = {};
-					Object.entries(prev).forEach(([k, v]) => { if (v !== tIdx) next[k] = v; });
-					next[hit] = tIdx;
-					return next;
-				});
-			}
-			isDragging.current = false;
-			dragTermIdx.current = null;
-			setDraggingTermIdx(null);
-			setActiveHover(null);
-		};
-
-		document.addEventListener('mousemove', onMouseMove);
-		document.addEventListener('mouseup', onMouseUp);
-		return () => {
-			document.removeEventListener('mousemove', onMouseMove);
-			document.removeEventListener('mouseup', onMouseUp);
-		};
-	}, []);
-
-	const onRootLayout = () => {
-		updateRootOrigin();
-	};
-
-	const handleTermMouseDown = (termIdx, e) => {
+	const handleTermPress = (termIdx) => {
 		if (submitted) return;
-		e.preventDefault();
-		updateRootOrigin();
-		const co = rootOrigin.current;
-		ghostX.setValue(e.clientX - co.x - dynTermWidth / 2);
-		ghostY.setValue(e.clientY - co.y - 20);
-		isDragging.current = true;
-		dragTermIdx.current = termIdx;
-		setDraggingTermIdx(termIdx);
+		setSelectedTermIdx((prev) => (prev === termIdx ? null : termIdx));
 	};
+
+	const handleDropZonePress = (descIdx) => {
+		if (submitted || selectedTermIdx === null) return;
+		assignTermToDropZone(selectedTermIdx, descIdx);
+		setSelectedTermIdx(null);
+	};
+
+	// ── HTML5 drag-and-drop for desktop browsers (web only) ──
+	// Tap-to-assign is handled by TouchableOpacity onPress (works on iPad + PC).
+	// This useEffect ONLY adds mouse-based drag-and-drop as a bonus for PC.
+	useEffect(() => {
+		if (Platform.OS !== 'web' || !selectedQuiz || typeof document === 'undefined') return;
+		// Skip on touch-only devices — they use tap-to-assign
+		if ('ontouchstart' in window && !window.matchMedia('(pointer: fine)').matches) return;
+
+		const cleanups = [];
+
+		document.querySelectorAll('[data-term-idx]').forEach(el => {
+			const idx = parseInt(el.dataset.termIdx, 10);
+			if (submitted) { el.removeAttribute('draggable'); return; }
+
+			el.setAttribute('draggable', 'true');
+			el.style.cursor = 'grab';
+
+			const onDragStart = (e) => {
+				el.style.cursor = 'grabbing';
+				e.dataTransfer.effectAllowed = 'move';
+				e.dataTransfer.setData('text/plain', String(idx));
+				dragTermIdx.current = idx;
+				setDraggingTermIdx(idx);
+				setSelectedTermIdx(idx);
+			};
+			const onDragEnd = () => {
+				el.style.cursor = 'grab';
+				dragTermIdx.current = null;
+				setDraggingTermIdx(null);
+				setActiveHover(null);
+			};
+
+			el.addEventListener('dragstart', onDragStart);
+			el.addEventListener('dragend', onDragEnd);
+			cleanups.push(() => {
+				el.removeEventListener('dragstart', onDragStart);
+				el.removeEventListener('dragend', onDragEnd);
+			});
+		});
+
+		document.querySelectorAll('[data-drop-idx]').forEach(el => {
+			const idx = parseInt(el.dataset.dropIdx, 10);
+
+			const onDragOver = (e) => {
+				if (submitted) return;
+				e.preventDefault();
+				e.dataTransfer.dropEffect = 'move';
+				setActiveHover(idx);
+			};
+			const onDragLeave = () => setActiveHover(prev => prev === idx ? null : prev);
+			const onDrop = (e) => {
+				if (submitted) return;
+				e.preventDefault();
+				let termIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+				if (Number.isNaN(termIdx)) termIdx = dragTermIdx.current;
+				if (termIdx !== null && termIdx !== undefined) {
+					assignRef.current(termIdx, idx);
+				}
+				dragTermIdx.current = null;
+				setDraggingTermIdx(null);
+				setSelectedTermIdx(null);
+				setActiveHover(null);
+			};
+
+			el.addEventListener('dragover', onDragOver);
+			el.addEventListener('dragenter', onDragOver);
+			el.addEventListener('dragleave', onDragLeave);
+			el.addEventListener('drop', onDrop);
+			cleanups.push(() => {
+				el.removeEventListener('dragover', onDragOver);
+				el.removeEventListener('dragenter', onDragOver);
+				el.removeEventListener('dragleave', onDragLeave);
+				el.removeEventListener('drop', onDrop);
+			});
+		});
+
+		return () => cleanups.forEach(fn => fn());
+	}, [shuffledTerms, shuffledDescs, submitted, selectedQuiz]);
 
 	// ── submit ────────────────────────────────────────────
 	const handleSubmit = async () => {
@@ -358,7 +377,7 @@ export default function QuizScreen({ route }) {
 	//
 	return (
 		<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
-			<View ref={rootRef} style={{ flex: 1 }} onLayout={onRootLayout}>
+			<View style={{ flex: 1 }}>
 				<View style={{ flex: 1 }}>
 
 					{/* Header */}
@@ -370,7 +389,7 @@ export default function QuizScreen({ route }) {
 					<Text style={styles.quizInstruction}>
 						Ziehe den Begriff auf das{' '}
 						<Text style={{ color: colors.accent }}>?</Text>
-						{' '}neben der passenden Beschreibung.
+						{' '}neben der passenden Beschreibung — oder tippe Begriff, dann Zielzone.
 					</Text>
 
 					{/* Column headers */}
@@ -394,20 +413,24 @@ export default function QuizScreen({ route }) {
 						{shuffledDescs.map((descItem, descIdx) => {
 							const termForRow = shuffledTerms[descIdx];     // left chip (shuffled)
 							const isBeingDragged = draggingTermIdx === descIdx;
+							const isSelected = selectedTermIdx === descIdx;
 							const isPlaced = placedTermIndices.has(descIdx); // this chip is elsewhere
 							const placed = userAnswers[descIdx];       // termIdx in THIS drop zone
 							return (
 								<View key={descIdx} style={[styles.row, descIdx % 2 === 0 && styles.rowAlt]}>
 
-									{/* LEFT: shuffled term chip */}
-									<View
+									{/* LEFT: term chip — TouchableOpacity for reliable tap on iPad */}
+									<TouchableOpacity
+										activeOpacity={0.7}
+										onPress={() => handleTermPress(descIdx)}
+										dataSet={{ termIdx: String(descIdx) }}
 										style={[
 											styles.termChip,
 											{ width: dynTermWidth - 16 },
 											isBeingDragged && styles.termChipActive,
+											isSelected && styles.termChipSelected,
 											isPlaced && styles.termChipPlaced,
 										]}
-										onMouseDown={(e) => handleTermMouseDown(descIdx, e)}
 										onLayout={onTermLayout}
 									>
 										<View style={styles.chipBadge}>
@@ -416,18 +439,21 @@ export default function QuizScreen({ route }) {
 										<Text style={styles.chipLabel} numberOfLines={2}>
 											{termForRow?.query}
 										</Text>
-									</View>
+									</TouchableOpacity>
 
-									{/* CENTER: drop zone */}
+									{/* CENTER: drop zone — TouchableOpacity for reliable tap on iPad */}
 									<View style={[styles.dropCol, { width: dynDropWidth }]}>
-										<View
-											ref={el => { dropRefs.current[descIdx] = el; }}
+										<TouchableOpacity
+											activeOpacity={0.7}
+											onPress={() => handleDropZonePress(descIdx)}
+											dataSet={{ dropIdx: String(descIdx) }}
 											onLayout={onDropZoneLayout}
 											style={[
 												styles.dropZone,
 												{ width: dynDropWidth - 16 },
 												placed !== undefined && styles.dropZoneFilled,
 												activeHover === descIdx && styles.dropZoneHover,
+												selectedTermIdx !== null && placed === undefined && styles.dropZoneSelectable,
 											]}
 										>
 											{placed !== undefined ? (
@@ -448,7 +474,7 @@ export default function QuizScreen({ route }) {
 											) : (
 												<Text style={styles.dropZoneQMark}>?</Text>
 											)}
-										</View>
+										</TouchableOpacity>
 									</View>
 
 									{/* RIGHT: shuffled description */}
@@ -467,25 +493,6 @@ export default function QuizScreen({ route }) {
 							style={styles.submitButton}
 						/>
 					</ScrollView>
-
-					{/* Ghost chip */}
-					{draggingTermIdx !== null && (
-						<Animated.View
-							pointerEvents="none"
-							style={[
-								styles.termChip,
-								styles.termChipGhost,
-								{ position: 'absolute', left: ghostX, top: ghostY, width: dynTermWidth },
-							]}
-						>
-							<View style={styles.chipBadge}>
-								<Text style={styles.chipBadgeText}>{draggingTermIdx + 1}</Text>
-							</View>
-							<Text style={styles.chipLabel} numberOfLines={1}>
-								{shuffledTerms[draggingTermIdx]?.query}
-							</Text>
-						</Animated.View>
-					)}
 
 				</View>
 			</View>
@@ -528,24 +535,21 @@ function useStyles(colors) { return StyleSheet.create({
 		backgroundColor: colors.surface,
 		paddingVertical: 8, paddingHorizontal: 8,
 		borderRadius: 8, borderWidth: 1.5, borderColor: colors.primary + '55',
-		cursor: 'grab',
+		...(Platform.OS === 'web' ? { cursor: 'grab', userSelect: 'none' } : {}),
 		...SHADOWS.sm,
 	},
 	termChipActive: {
 		borderColor: colors.accent,
 		backgroundColor: colors.accent + '15',
-		cursor: 'grabbing',
+		...(Platform.OS === 'web' ? { cursor: 'grabbing' } : {}),
+	},
+	termChipSelected: {
+		borderColor: colors.primary,
+		backgroundColor: colors.primary + '20',
 	},
 	termChipPlaced: {
 		opacity: 0.4,
 		borderColor: colors.success + '60',
-	},
-	termChipGhost: {
-		zIndex: 9999, opacity: 0.92,
-		borderColor: colors.accent,
-		backgroundColor: colors.surface,
-		cursor: 'grabbing',
-		...SHADOWS.md,
 	},
 	chipBadge: {
 		width: 20, height: 20, borderRadius: 10, backgroundColor: colors.primary,
@@ -573,6 +577,10 @@ function useStyles(colors) { return StyleSheet.create({
 	dropZoneHover: {
 		borderColor: colors.accent, backgroundColor: colors.accent + '25',
 		transform: [{ scale: 1.04 }],
+	},
+	dropZoneSelectable: {
+		borderColor: colors.primary,
+		backgroundColor: colors.primary + '12',
 	},
 	dropZoneQMark: { color: colors.primary + '80', fontSize: 22, fontWeight: 'bold' },
 	dropZoneContent: { flexDirection: 'row', alignItems: 'center', width: '100%' },

@@ -191,6 +191,10 @@ export default function VokabelLearnScreen() {
 		outputRange: ['180deg', '360deg'],
 	});
 
+	const flashcardColors = showAnswer
+		? (isDark ? ['#1E293B', '#334155'] : [colors.surface, colors.surfaceLight])
+		: [colors.primary + '20', colors.primary + '10'];
+
 	return (
 		<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 			<View style={styles.learnContainer}>
@@ -233,7 +237,7 @@ export default function VokabelLearnScreen() {
 						]}
 					>
 						<LinearGradient
-							colors={showAnswer ? ['#1E293B', '#334155'] : [colors.primary + '20', colors.primary + '10']}
+							colors={flashcardColors}
 							style={styles.flashcardInner}
 						>
 							<Text style={styles.flashcardLabel}>

@@ -186,3 +186,8 @@ export async function deleteQuizResult(id) {
 export async function deleteAllQuizResults() {
   await fetch(`${getBaseUrl()}/quizResultsAll`, { method: 'DELETE' });
 }
+
+export async function getNetworkInfo() {
+  const res = await fetch(`${getBaseUrl()}/networkInfo`);
+  return await res.json();
+}

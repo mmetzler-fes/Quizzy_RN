@@ -10,10 +10,13 @@ import {
 	Platform,
 	TouchableOpacity,
 	ScrollView,
+	ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
+import QRCode from 'react-native-qrcode-svg';
+import { getNetworkInfo } from '../database/database';
 import { GradientButton, StyledInput } from '../components/UI';
 
 const { width, height } = Dimensions.get('window');
@@ -21,6 +24,10 @@ const { width, height } = Dimensions.get('window');
 export default function LoginScreen({ navigation }) {
 	const isFocused = useIsFocused();
 	const [username, setUsername] = useState('');
+	const [networkUrl, setNetworkUrl] = useState('');
+	const [wifiIps, setWifiIps] = useState([]);
+	const [privateLanIps, setPrivateLanIps] = useState([]);
+	const [networkLoading, setNetworkLoading] = useState(false);
 	const { colors, isDark, toggleTheme } = useTheme();
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(50)).current;
@@ -50,6 +57,42 @@ export default function LoginScreen({ navigation }) {
 				}),
 			]).start();
 		}
+	}, [isFocused]);
+
+	useEffect(() => {
+		let isMounted = true;
+
+		async function loadNetworkInfo() {
+			setNetworkLoading(true);
+			try {
+				const info = await getNetworkInfo();
+				if (!isMounted) return;
+
+				const wifi = Array.isArray(info?.wifiIps) ? info.wifiIps : [];
+				const privateIps = Array.isArray(info?.privateLanIps) ? info.privateLanIps : [];
+				const urls = Array.isArray(info?.urls) ? info.urls : [];
+
+				setWifiIps(wifi);
+				setPrivateLanIps(privateIps);
+				setNetworkUrl(urls.length > 0 ? urls[0] : '');
+			} catch (error) {
+				if (isMounted) {
+					setWifiIps([]);
+					setPrivateLanIps([]);
+					setNetworkUrl('');
+				}
+			} finally {
+				if (isMounted) setNetworkLoading(false);
+			}
+		}
+
+		if (isFocused) {
+			loadNetworkInfo();
+		}
+
+		return () => {
+			isMounted = false;
+		};
 	}, [isFocused]);
 
 	useEffect(() => {
@@ -165,6 +208,27 @@ export default function LoginScreen({ navigation }) {
 								style={styles.loginButton}
 							/>
 
+							{networkLoading && (
+								<View style={[styles.networkCard, { borderColor: colors.border, backgroundColor: colors.surfaceLight }]}> 
+									<ActivityIndicator size="small" color={colors.primary} />
+									<Text style={[styles.networkHintText, { color: colors.textMuted }]}>WLAN wird geprueft ...</Text>
+								</View>
+							)}
+
+							{!networkLoading && !!networkUrl && (
+								<View style={[styles.networkCard, { borderColor: colors.border, backgroundColor: colors.surfaceLight }]}> 
+									<Text style={[styles.networkTitle, { color: colors.textPrimary }]}>App per WLAN oeffnen</Text>
+									<QRCode value={networkUrl} size={140} color={colors.textPrimary} backgroundColor="transparent" />
+									<Text style={[styles.networkUrlText, { color: colors.primary }]}>{networkUrl}</Text>
+									{wifiIps.length > 1 && (
+										<Text style={[styles.networkHintText, { color: colors.textMuted }]}>Weitere WLAN-IPs: {wifiIps.slice(1).join(', ')}</Text>
+									)}
+									{privateLanIps.length > 0 && (
+										<Text style={[styles.networkHintText, { color: colors.textMuted }]}>Weitere private LAN-IPs: {privateLanIps.join(', ')}</Text>
+									)}
+								</View>
+							)}
+
 							<View style={[styles.divider, { backgroundColor: colors.border }]} />
 
 							<TouchableOpacity
@@ -263,6 +327,27 @@ const styles = StyleSheet.create({
 		fontSize: FONTS.sizes.md,
 		color: COLORS.textMuted,
 		marginBottom: SPACING.xxl,
+	},
+	networkCard: {
+		marginTop: SPACING.lg,
+		borderWidth: 1,
+		borderRadius: RADIUS.lg,
+		padding: SPACING.md,
+		alignItems: 'center',
+		gap: SPACING.sm,
+	},
+	networkTitle: {
+		fontSize: FONTS.sizes.md,
+		fontWeight: FONTS.weights.bold,
+	},
+	networkUrlText: {
+		fontSize: FONTS.sizes.sm,
+		fontWeight: FONTS.weights.bold,
+		textAlign: 'center',
+	},
+	networkHintText: {
+		fontSize: FONTS.sizes.xs,
+		textAlign: 'center',
 	},
 	loginButton: {
 		marginTop: SPACING.sm,
