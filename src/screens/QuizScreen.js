@@ -14,6 +14,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { GradientButton, Card, LoadingView, EmptyState, Badge } from '../components/UI';
 import { getQuizByName, getQuizNames, saveQuizResult, getSelectedTopics, getExamMode, getTeacherTopics } from '../database/database';
+import { DndContext, DragOverlay, useDraggable, useDroppable, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 
 function shuffle(array) {
 	const arr = [...array];
@@ -26,6 +27,104 @@ function shuffle(array) {
 
 // ─── constants ───────────────────────────────────────────
 const ROW_MIN_H = 64;
+
+// ─── dnd-kit sub-components ─────────────────────────────
+
+function DraggableTermChip({ termIdx, term, isSelected, isPlaced, chipWidth, onLayout, onPress, submitted, styles }) {
+	const { listeners, setNodeRef, isDragging } = useDraggable({
+		id: `term-${termIdx}`,
+		data: { termIdx },
+		disabled: submitted,
+	});
+
+	const viewRef = useRef(null);
+
+	const combinedRef = useCallback((node) => {
+		viewRef.current = node;
+		setNodeRef(node);
+	}, [setNodeRef]);
+
+	// Attach dnd-kit pointer/key listeners directly to the DOM element
+	// (RN Web View may not forward onPointerDown as a prop)
+	useEffect(() => {
+		const el = viewRef.current;
+		if (!el || !listeners) return;
+		const attached = [];
+		Object.entries(listeners).forEach(([prop, handler]) => {
+			const event = prop.slice(2).toLowerCase();
+			el.addEventListener(event, handler);
+			attached.push([event, handler]);
+		});
+		return () => attached.forEach(([evt, fn]) => el.removeEventListener(evt, fn));
+	}, [listeners]);
+
+	return (
+		<View
+			ref={combinedRef}
+			style={[
+				styles.termChip,
+				{ width: chipWidth },
+				isDragging && styles.termChipActive,
+				isSelected && !isDragging && styles.termChipSelected,
+				isPlaced && !isDragging && styles.termChipPlaced,
+			]}
+			onLayout={onLayout}
+		>
+			<TouchableOpacity
+				activeOpacity={0.7}
+				onPress={onPress}
+				style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+			>
+				<View style={styles.chipBadge}>
+					<Text style={styles.chipBadgeText}>{termIdx + 1}</Text>
+				</View>
+				<Text style={styles.chipLabel} numberOfLines={2}>{term}</Text>
+			</TouchableOpacity>
+		</View>
+	);
+}
+
+function DroppableDropZone({ descIdx, placedTermIdx, placedTermQuery, hasSelection, onPress, onClear, onLayout, dropWidth, submitted, styles }) {
+	const { setNodeRef, isOver } = useDroppable({
+		id: `drop-${descIdx}`,
+		disabled: submitted,
+	});
+	const filled = placedTermIdx !== undefined;
+	return (
+		<View style={[styles.dropCol, { width: dropWidth }]}>
+			<View ref={setNodeRef}>
+				<TouchableOpacity
+					activeOpacity={0.7}
+					onPress={onPress}
+					onLayout={onLayout}
+					style={[
+						styles.dropZone,
+						{ width: dropWidth - 16 },
+						filled && styles.dropZoneFilled,
+						isOver && !submitted && styles.dropZoneHover,
+						hasSelection && !filled && !submitted && styles.dropZoneSelectable,
+					]}
+				>
+					{filled ? (
+						<View style={styles.dropZoneContent}>
+							<View style={styles.dropZoneBadge}>
+								<Text style={styles.dropZoneBadgeText}>{placedTermIdx + 1}</Text>
+							</View>
+							<Text style={[styles.dropZoneFilledText, { flex: 1 }]} numberOfLines={2}>
+								{placedTermQuery}
+							</Text>
+							<TouchableOpacity onPress={onClear} style={styles.clearBtn}>
+								<Text style={styles.clearBtnText}>✕</Text>
+							</TouchableOpacity>
+						</View>
+					) : (
+						<Text style={styles.dropZoneQMark}>?</Text>
+					)}
+				</TouchableOpacity>
+			</View>
+		</View>
+	);
+}
 
 // ─── QuizScreen ──────────────────────────────────────────
 //
@@ -52,8 +151,7 @@ export default function QuizScreen({ route }) {
 	const [submitted, setSubmitted] = useState(false);
 	const [score, setScore] = useState(null);
 	const [loading, setLoading] = useState(true);
-	const [activeHover, setActiveHover] = useState(null);
-	const [draggingTermIdx, setDraggingTermIdx] = useState(null); // termIdx in shuffledTerms
+	const [draggingTermIdx, setDraggingTermIdx] = useState(null);
 	const [selectedTermIdx, setSelectedTermIdx] = useState(null);
 	const [isExamMode, setIsExamMode] = useState(false);
 	const [currentExamTopicIndex, setCurrentExamTopicIndex] = useState(0);
@@ -61,9 +159,6 @@ export default function QuizScreen({ route }) {
 
 	const [dynTermWidth, setDynTermWidth] = useState(140);
 	const [dynDropWidth, setDynDropWidth] = useState(150);
-	const dragTermIdx = useRef(null);
-	const selectedTermIdxRef = useRef(null);
-	const assignRef = useRef(null);
 
 	// ── data ─────────────────────────────────────────────
 	useFocusEffect(
@@ -142,10 +237,6 @@ export default function QuizScreen({ route }) {
 		});
 	};
 
-	// keep refs in sync so DOM callbacks always see latest values
-	useEffect(() => { selectedTermIdxRef.current = selectedTermIdx; }, [selectedTermIdx]);
-	useEffect(() => { assignRef.current = assignTermToDropZone; });
-
 	const handleTermPress = (termIdx) => {
 		if (submitted) return;
 		setSelectedTermIdx((prev) => (prev === termIdx ? null : termIdx));
@@ -157,84 +248,28 @@ export default function QuizScreen({ route }) {
 		setSelectedTermIdx(null);
 	};
 
-	// ── HTML5 drag-and-drop for desktop browsers (web only) ──
-	// Tap-to-assign is handled by TouchableOpacity onPress (works on iPad + PC).
-	// This useEffect ONLY adds mouse-based drag-and-drop as a bonus for PC.
-	useEffect(() => {
-		if (Platform.OS !== 'web' || !selectedQuiz || typeof document === 'undefined') return;
-		// Skip on touch-only devices — they use tap-to-assign
-		if ('ontouchstart' in window && !window.matchMedia('(pointer: fine)').matches) return;
+	// ── dnd-kit sensors (Mouse for PC, Touch with delay for iPad) ──
+	const sensors = useSensors(
+		useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+		useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
+	);
 
-		const cleanups = [];
+	const handleDragStart = (event) => {
+		const termIdx = event.active.data.current.termIdx;
+		setDraggingTermIdx(termIdx);
+		setSelectedTermIdx(termIdx);
+	};
 
-		document.querySelectorAll('[data-term-idx]').forEach(el => {
-			const idx = parseInt(el.dataset.termIdx, 10);
-			if (submitted) { el.removeAttribute('draggable'); return; }
-
-			el.setAttribute('draggable', 'true');
-			el.style.cursor = 'grab';
-
-			const onDragStart = (e) => {
-				el.style.cursor = 'grabbing';
-				e.dataTransfer.effectAllowed = 'move';
-				e.dataTransfer.setData('text/plain', String(idx));
-				dragTermIdx.current = idx;
-				setDraggingTermIdx(idx);
-				setSelectedTermIdx(idx);
-			};
-			const onDragEnd = () => {
-				el.style.cursor = 'grab';
-				dragTermIdx.current = null;
-				setDraggingTermIdx(null);
-				setActiveHover(null);
-			};
-
-			el.addEventListener('dragstart', onDragStart);
-			el.addEventListener('dragend', onDragEnd);
-			cleanups.push(() => {
-				el.removeEventListener('dragstart', onDragStart);
-				el.removeEventListener('dragend', onDragEnd);
-			});
-		});
-
-		document.querySelectorAll('[data-drop-idx]').forEach(el => {
-			const idx = parseInt(el.dataset.dropIdx, 10);
-
-			const onDragOver = (e) => {
-				if (submitted) return;
-				e.preventDefault();
-				e.dataTransfer.dropEffect = 'move';
-				setActiveHover(idx);
-			};
-			const onDragLeave = () => setActiveHover(prev => prev === idx ? null : prev);
-			const onDrop = (e) => {
-				if (submitted) return;
-				e.preventDefault();
-				let termIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
-				if (Number.isNaN(termIdx)) termIdx = dragTermIdx.current;
-				if (termIdx !== null && termIdx !== undefined) {
-					assignRef.current(termIdx, idx);
-				}
-				dragTermIdx.current = null;
-				setDraggingTermIdx(null);
-				setSelectedTermIdx(null);
-				setActiveHover(null);
-			};
-
-			el.addEventListener('dragover', onDragOver);
-			el.addEventListener('dragenter', onDragOver);
-			el.addEventListener('dragleave', onDragLeave);
-			el.addEventListener('drop', onDrop);
-			cleanups.push(() => {
-				el.removeEventListener('dragover', onDragOver);
-				el.removeEventListener('dragenter', onDragOver);
-				el.removeEventListener('dragleave', onDragLeave);
-				el.removeEventListener('drop', onDrop);
-			});
-		});
-
-		return () => cleanups.forEach(fn => fn());
-	}, [shuffledTerms, shuffledDescs, submitted, selectedQuiz]);
+	const handleDragEnd = (event) => {
+		const { active, over } = event;
+		setDraggingTermIdx(null);
+		if (over) {
+			const termIdx = active.data.current.termIdx;
+			const dropIdx = parseInt(String(over.id).replace('drop-', ''), 10);
+			assignTermToDropZone(termIdx, dropIdx);
+			setSelectedTermIdx(null);
+		}
+	};
 
 	// ── submit ────────────────────────────────────────────
 	const handleSubmit = async () => {
@@ -376,127 +411,110 @@ export default function QuizScreen({ route }) {
 	// Per row:  [shuffledTerms[i].query chip]  [Drop Zone (center)]  [shuffledDescs[i].answer]
 	//
 	return (
-		<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
-			<View style={{ flex: 1 }}>
+		<DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+			<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 				<View style={{ flex: 1 }}>
+					<View style={{ flex: 1 }}>
 
-					{/* Header */}
-					<View style={styles.header}>
-						<Badge text={selectedQuiz} variant="primary" />
-						<Text style={styles.headerUser}>👤 {username}</Text>
-					</View>
-					<Text style={styles.quizTitle}>Zuordnungs-Quiz</Text>
-					<Text style={styles.quizInstruction}>
-						Ziehe den Begriff auf das{' '}
-						<Text style={{ color: colors.accent }}>?</Text>
-						{' '}neben der passenden Beschreibung — oder tippe Begriff, dann Zielzone.
-					</Text>
-
-					{/* Column headers */}
-					<View style={styles.colHeaders}>
-						<View style={{ width: dynTermWidth }}>
-							<Text style={styles.colHeaderText}>BEGRIFFE</Text>
+						{/* Header */}
+						<View style={styles.header}>
+							<Badge text={selectedQuiz} variant="primary" />
+							<Text style={styles.headerUser}>👤 {username}</Text>
 						</View>
-						<View style={{ width: dynDropWidth, alignItems: 'center' }}>
-							<Text style={styles.colHeaderText}>ZUORDNUNG</Text>
+						<Text style={styles.quizTitle}>Zuordnungs-Quiz</Text>
+						<Text style={styles.quizInstruction}>
+							Ziehe den Begriff auf das{' '}
+							<Text style={{ color: colors.accent }}>?</Text>
+							{' '}neben der passenden Beschreibung — oder tippe Begriff, dann Zielzone.
+						</Text>
+
+						{/* Column headers */}
+						<View style={styles.colHeaders}>
+							<View style={{ width: dynTermWidth }}>
+								<Text style={styles.colHeaderText}>BEGRIFFE</Text>
+							</View>
+							<View style={{ width: dynDropWidth, alignItems: 'center' }}>
+								<Text style={styles.colHeaderText}>ZUORDNUNG</Text>
+							</View>
+							<View style={{ flex: 1, paddingHorizontal: 8 }}>
+								<Text style={styles.colHeaderText}>BESCHREIBUNG</Text>
+							</View>
 						</View>
-						<View style={{ flex: 1, paddingHorizontal: 8 }}>
-							<Text style={styles.colHeaderText}>BESCHREIBUNG</Text>
-						</View>
-					</View>
 
-					<ScrollView
-						style={{ flex: 1 }}
-						contentContainerStyle={{ paddingBottom: 60 }}
-						showsVerticalScrollIndicator={false}
-					>
-						{shuffledDescs.map((descItem, descIdx) => {
-							const termForRow = shuffledTerms[descIdx];     // left chip (shuffled)
-							const isBeingDragged = draggingTermIdx === descIdx;
-							const isSelected = selectedTermIdx === descIdx;
-							const isPlaced = placedTermIndices.has(descIdx); // this chip is elsewhere
-							const placed = userAnswers[descIdx];       // termIdx in THIS drop zone
-							return (
-								<View key={descIdx} style={[styles.row, descIdx % 2 === 0 && styles.rowAlt]}>
+						<ScrollView
+							style={{ flex: 1 }}
+							contentContainerStyle={{ paddingBottom: 60 }}
+							showsVerticalScrollIndicator={false}
+						>
+							{shuffledDescs.map((descItem, descIdx) => {
+								const termForRow = shuffledTerms[descIdx];
+								const isSelected = selectedTermIdx === descIdx;
+								const isPlaced = placedTermIndices.has(descIdx);
+								const placed = userAnswers[descIdx];
+								return (
+									<View key={descIdx} style={[styles.row, descIdx % 2 === 0 && styles.rowAlt]}>
 
-									{/* LEFT: term chip — TouchableOpacity for reliable tap on iPad */}
-									<TouchableOpacity
-										activeOpacity={0.7}
-										onPress={() => handleTermPress(descIdx)}
-										dataSet={{ termIdx: String(descIdx) }}
-										style={[
-											styles.termChip,
-											{ width: dynTermWidth - 16 },
-											isBeingDragged && styles.termChipActive,
-											isSelected && styles.termChipSelected,
-											isPlaced && styles.termChipPlaced,
-										]}
-										onLayout={onTermLayout}
-									>
-										<View style={styles.chipBadge}>
-											<Text style={styles.chipBadgeText}>{descIdx + 1}</Text>
-										</View>
-										<Text style={styles.chipLabel} numberOfLines={2}>
-											{termForRow?.query}
-										</Text>
-									</TouchableOpacity>
+										{/* LEFT: draggable term chip */}
+										<DraggableTermChip
+											termIdx={descIdx}
+											term={termForRow?.query}
+											isSelected={isSelected}
+											isPlaced={isPlaced}
+											chipWidth={dynTermWidth - 16}
+											onLayout={onTermLayout}
+											onPress={() => handleTermPress(descIdx)}
+											submitted={submitted}
+											styles={styles}
+										/>
 
-									{/* CENTER: drop zone — TouchableOpacity for reliable tap on iPad */}
-									<View style={[styles.dropCol, { width: dynDropWidth }]}>
-										<TouchableOpacity
-											activeOpacity={0.7}
+										{/* CENTER: droppable zone */}
+										<DroppableDropZone
+											descIdx={descIdx}
+											placedTermIdx={placed}
+											placedTermQuery={placed !== undefined ? shuffledTerms[placed]?.query : null}
+											hasSelection={selectedTermIdx !== null}
 											onPress={() => handleDropZonePress(descIdx)}
-											dataSet={{ dropIdx: String(descIdx) }}
+											onClear={() => setUserAnswers(prev => { const n = { ...prev }; delete n[descIdx]; return n; })}
 											onLayout={onDropZoneLayout}
-											style={[
-												styles.dropZone,
-												{ width: dynDropWidth - 16 },
-												placed !== undefined && styles.dropZoneFilled,
-												activeHover === descIdx && styles.dropZoneHover,
-												selectedTermIdx !== null && placed === undefined && styles.dropZoneSelectable,
-											]}
-										>
-											{placed !== undefined ? (
-												<View style={styles.dropZoneContent}>
-													<View style={styles.dropZoneBadge}>
-														<Text style={styles.dropZoneBadgeText}>{placed + 1}</Text>
-													</View>
-													<Text style={[styles.dropZoneFilledText, { flex: 1 }]} numberOfLines={2}>
-														{shuffledTerms[placed]?.query}
-													</Text>
-													<TouchableOpacity
-														onPress={() => setUserAnswers(prev => { const n = { ...prev }; delete n[descIdx]; return n; })}
-														style={styles.clearBtn}
-													>
-														<Text style={styles.clearBtnText}>✕</Text>
-													</TouchableOpacity>
-												</View>
-											) : (
-												<Text style={styles.dropZoneQMark}>?</Text>
-											)}
-										</TouchableOpacity>
+											dropWidth={dynDropWidth}
+											submitted={submitted}
+											styles={styles}
+										/>
+
+										{/* RIGHT: shuffled description */}
+										<View style={{ flex: 1, paddingHorizontal: 12, justifyContent: 'center' }}>
+											<Text style={styles.descText}>{descItem.answer}</Text>
+										</View>
+
 									</View>
+								);
+							})}
 
-									{/* RIGHT: shuffled description */}
-									<View style={{ flex: 1, paddingHorizontal: 12, justifyContent: 'center' }}>
-										<Text style={styles.descText}>{descItem.answer}</Text>
-									</View>
+							<GradientButton
+								title="✅  Einreichen"
+								onPress={handleSubmit}
+								variant="success"
+								style={styles.submitButton}
+							/>
+						</ScrollView>
 
-								</View>
-							);
-						})}
-
-						<GradientButton
-							title="✅  Einreichen"
-							onPress={handleSubmit}
-							variant="success"
-							style={styles.submitButton}
-						/>
-					</ScrollView>
-
+					</View>
 				</View>
-			</View>
-		</LinearGradient>
+			</LinearGradient>
+
+			<DragOverlay>
+				{draggingTermIdx !== null && (
+					<View style={[styles.termChip, styles.termChipActive, { width: dynTermWidth - 16 }]}>
+						<View style={styles.chipBadge}>
+							<Text style={styles.chipBadgeText}>{draggingTermIdx + 1}</Text>
+						</View>
+						<Text style={styles.chipLabel} numberOfLines={2}>
+							{shuffledTerms[draggingTermIdx]?.query}
+						</Text>
+					</View>
+				)}
+			</DragOverlay>
+		</DndContext>
 	);
 }
 
