@@ -12,7 +12,8 @@ import {
 	Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 import {
 	GradientButton,
 	Card,
@@ -31,15 +32,22 @@ import {
 	getQuizNames,
 	getQuizByName,
 	addQuizItem,
-	deleteQuizItem,
 	updateQuizItem,
+	deleteQuizItem,
 	deleteQuizByName,
+	getExamMode,
+	setExamMode,
+	getTeacherTopics,
+	setTeacherTopics,
+	setSelectedTopics,
 } from '../database/database';
 
 // ============================================================
 // ADMIN LOGIN
 // ============================================================
 function AdminLogin({ onLogin, onBack, fadeAnim }) {
+	const { colors, isDark } = useTheme();
+	const styles = useStyles(colors);
 	const [username, setUsername] = useState('');
 	const [password, setPassword] = useState('');
 	const [loginError, setLoginError] = useState('');
@@ -67,7 +75,7 @@ function AdminLogin({ onLogin, onBack, fadeAnim }) {
 	};
 
 	return (
-		<LinearGradient colors={[COLORS.background, '#1a0a2e']} style={styles.container}>
+		<LinearGradient colors={isDark ? [colors.background, '#1a0a2e'] : [colors.background, colors.background]} style={styles.container}>
 			<ScrollView contentContainerStyle={styles.loginScrollContent}>
 				<Animated.View style={[styles.loginContainer, { opacity: fadeAnim }]}>
 					<View style={styles.loginIconWrap}>
@@ -92,7 +100,7 @@ function AdminLogin({ onLogin, onBack, fadeAnim }) {
 						<TextInput
 							style={styles.input}
 							placeholder="admin"
-							placeholderTextColor={COLORS.textMuted}
+							placeholderTextColor={colors.textMuted}
 							value={username}
 							onChangeText={setUsername}
 							autoCapitalize="none"
@@ -102,7 +110,7 @@ function AdminLogin({ onLogin, onBack, fadeAnim }) {
 						<TextInput
 							style={styles.input}
 							placeholder="••••••••"
-							placeholderTextColor={COLORS.textMuted}
+							placeholderTextColor={colors.textMuted}
 							value={password}
 							onChangeText={setPassword}
 							secureTextEntry
@@ -129,6 +137,8 @@ function AdminLogin({ onLogin, onBack, fadeAnim }) {
 // RESULTS TAB
 // ============================================================
 function ResultsTab() {
+	const { colors, isDark } = useTheme();
+	const styles = useStyles(colors);
 	const [results, setResults] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [expandedId, setExpandedId] = useState(null);
@@ -164,6 +174,18 @@ function ResultsTab() {
 		}
 	};
 
+	const handleExportResults = () => {
+		const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(results, null, 2));
+		if (Platform.OS === 'web') {
+			const a = document.createElement('a');
+			a.href = dataStr;
+			a.download = `schueler_ergebnisse_${new Date().toISOString().slice(0,10)}.json`;
+			a.click();
+		} else {
+			Alert.alert('Info', 'Export ist derzeit nur im Web/Desktop verfügbar.');
+		}
+	};
+
 	const formatDate = (isoStr) => {
 		const d = new Date(isoStr);
 		return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -179,20 +201,23 @@ function ResultsTab() {
 		<>
 			{/* Stats */}
 			<View style={styles.statsRow}>
-				<StatsCard icon="📝" value={results.length} label="Abgaben" color={COLORS.primary} />
+				<StatsCard icon="📝" value={results.length} label="Abgaben" color={colors.primary} />
 				<View style={{ width: SPACING.sm }} />
-				<StatsCard icon="👥" value={uniqueUsers.length} label="Schüler" color={COLORS.accent} />
+				<StatsCard icon="👥" value={uniqueUsers.length} label="Schüler" color={colors.accent} />
 				<View style={{ width: SPACING.sm }} />
-				<StatsCard icon="📊" value={`${avgScore}%`} label="Ø Score" color={avgScore >= 70 ? COLORS.success : COLORS.error} />
+				<StatsCard icon="📊" value={`${avgScore}%`} label="Ø Score" color={avgScore >= 70 ? colors.success : colors.error} />
 			</View>
 
 			{/* Actions */}
 			<View style={styles.actionsRow}>
-				<TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={handleDeleteAll}>
-					<Text style={styles.actionBtnText}>🗑️ Alle löschen</Text>
+				<TouchableOpacity style={[styles.actionBtn, { borderColor: colors.primary + '40' }]} onPress={handleExportResults}>
+					<Text style={styles.actionBtnText}>📤 JSON Export</Text>
 				</TouchableOpacity>
 				<TouchableOpacity style={[styles.actionBtn, styles.actionBtnRefresh]} onPress={loadResults}>
 					<Text style={styles.actionBtnText}>🔄 Aktualisieren</Text>
+				</TouchableOpacity>
+				<TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={handleDeleteAll}>
+					<Text style={styles.actionBtnText}>🗑️ Alle löschen</Text>
 				</TouchableOpacity>
 			</View>
 
@@ -201,7 +226,7 @@ function ResultsTab() {
 				<TextInput
 					style={styles.filterInput}
 					placeholder="🔍  Schüler filtern..."
-					placeholderTextColor={COLORS.textMuted}
+					placeholderTextColor={colors.textMuted}
 					value={filterUser}
 					onChangeText={setFilterUser}
 				/>
@@ -217,7 +242,7 @@ function ResultsTab() {
 			) : (
 				filteredResults.map((result) => {
 					const isExpanded = expandedId === result.id;
-					const scoreColor = result.percentage >= 80 ? COLORS.success : result.percentage >= 50 ? COLORS.accent : COLORS.error;
+					const scoreColor = result.percentage >= 80 ? colors.success : result.percentage >= 50 ? colors.accent : colors.error;
 
 					return (
 						<TouchableOpacity key={result.id} onPress={() => setExpandedId(isExpanded ? null : result.id)} activeOpacity={0.8}>
@@ -241,7 +266,7 @@ function ResultsTab() {
 										<View style={styles.detailDivider} />
 										<Text style={styles.detailSectionTitle}>📋 Detaillierte Antworten</Text>
 										{result.details.map((d, i) => (
-											<View key={i} style={[styles.detailRow, { borderLeftColor: d.isCorrect ? COLORS.success : COLORS.error }]}>
+											<View key={i} style={[styles.detailRow, { borderLeftColor: d.isCorrect ? colors.success : colors.error }]}>
 												<View style={styles.detailRowHeader}>
 													<Text style={styles.detailQuery}>{d.query}</Text>
 													<Badge text={d.isCorrect ? '✅ Richtig' : '❌ Falsch'} variant={d.isCorrect ? 'success' : 'error'} />
@@ -270,7 +295,11 @@ function ResultsTab() {
 // QUIZ MANAGEMENT TAB
 // ============================================================
 function QuizManagementTab() {
+	const { colors, isDark } = useTheme();
+	const styles = useStyles(colors);
 	const [quizNames, setQuizNames] = useState([]);
+	const [activeTopics, setActiveTopics] = useState([]);
+	const [examMode, setExamModeState] = useState(false);
 	const [selectedTopic, setSelectedTopic] = useState(null);
 	const [topicItems, setTopicItems] = useState([]);
 	const [loading, setLoading] = useState(true);
@@ -291,7 +320,11 @@ function QuizManagementTab() {
 		setLoading(true);
 		try {
 			const names = await getQuizNames();
+			const active = await getTeacherTopics();
+			const exam = await getExamMode();
 			setQuizNames(names);
+			setActiveTopics(active || []);
+			setExamModeState(exam || false);
 		} catch (error) {
 			console.error('Error loading topics:', error);
 		} finally {
@@ -386,25 +419,28 @@ function QuizManagementTab() {
 					try {
 						const data = JSON.parse(event.target.result);
 
-						// Support new hierarchical format OR fallback to old array formatting just in case
-						if (data && data.quizname && Array.isArray(data.items)) {
+						const quizName = data.quizname || data.title || data.name || data.thema || 'Importiertes Quiz';
+						const itemsArray = data.items || data.questions || data.data || data.vokabeln || (Array.isArray(data) ? data : null);
+
+						if (itemsArray && Array.isArray(itemsArray)) {
 							let importCount = 0;
-							for (const item of data.items) {
-								if (item.query && item.answer) {
-									await addQuizItem(data.quizname, item.query, item.answer);
+							for (const item of itemsArray) {
+								const q = item.query || item.question || item.Frage || item.frage || item.term || item.q;
+								const a = item.answer || item.Antwort || item.antwort || item.definition || item.a;
+								
+								const qName = item.quizname || item.thema || quizName;
+
+								if (q && a) {
+									await addQuizItem(qName, String(q), String(a));
 									importCount++;
 								}
 							}
-							Alert.alert('Erfolg', `Thema "${data.quizname}" mit ${importCount} Fragen wurde importiert.`);
-						} else if (Array.isArray(data)) {
-							let importCount = 0;
-							for (const item of data) {
-								if (item.quizname && item.query && item.answer) {
-									await addQuizItem(item.quizname, item.query, item.answer);
-									importCount++;
-								}
+							
+							if (importCount > 0) {
+								Alert.alert('Erfolg', `${importCount} Fragen wurden importiert.`);
+							} else {
+								Alert.alert('Fehler', 'Die JSON-Datei enthielt keine erkennbaren Fragen/Antworten.');
 							}
-							Alert.alert('Erfolg', `${importCount} Fragen wurden importiert.`);
 						} else {
 							throw new Error('Format ungültig');
 						}
@@ -493,24 +529,24 @@ function QuizManagementTab() {
 					</View>
 					<View style={styles.topicDetailActions}>
 						<TouchableOpacity
-							style={[styles.topicActionBtn, { backgroundColor: COLORS.success + '15', borderColor: COLORS.success + '40' }]}
+							style={[styles.topicActionBtn, { backgroundColor: colors.success + '15', borderColor: colors.success + '40' }]}
 							onPress={() => { setShowAddQuestion(!showAddQuestion); setEditingItem(null); }}
 						>
-							<Text style={[styles.topicActionBtnText, { color: COLORS.success }]}>
+							<Text style={[styles.topicActionBtnText, { color: colors.success }]}>
 								{showAddQuestion ? '✕ Abbrechen' : '+ Frage'}
 							</Text>
 						</TouchableOpacity>
 						<TouchableOpacity
-							style={[styles.topicActionBtn, { backgroundColor: COLORS.primaryLight + '15', borderColor: COLORS.primary + '40', marginLeft: 8 }]}
+							style={[styles.topicActionBtn, { backgroundColor: colors.primaryLight + '15', borderColor: colors.primary + '40', marginLeft: 8 }]}
 							onPress={() => handleExportTopic(selectedTopic)}
 						>
-							<Text style={[styles.topicActionBtnText, { color: COLORS.primaryLight }]}>📤 Export</Text>
+							<Text style={[styles.topicActionBtnText, { color: colors.primaryLight }]}>📤 Export</Text>
 						</TouchableOpacity>
 						<TouchableOpacity
-							style={[styles.topicActionBtn, { backgroundColor: COLORS.error + '15', borderColor: COLORS.error + '40', marginLeft: 8 }]}
+							style={[styles.topicActionBtn, { backgroundColor: colors.error + '15', borderColor: colors.error + '40', marginLeft: 8 }]}
 							onPress={() => handleDeleteTopic(selectedTopic)}
 						>
-							<Text style={[styles.topicActionBtnText, { color: COLORS.error }]}>🗑️ Löschen</Text>
+							<Text style={[styles.topicActionBtnText, { color: colors.error }]}>🗑️ Löschen</Text>
 						</TouchableOpacity>
 					</View>
 				</View>
@@ -523,7 +559,7 @@ function QuizManagementTab() {
 						<TextInput
 							style={styles.input}
 							placeholder="z.B. Primary Key"
-							placeholderTextColor={COLORS.textMuted}
+							placeholderTextColor={colors.textMuted}
 							value={newQuery}
 							onChangeText={setNewQuery}
 						/>
@@ -531,7 +567,7 @@ function QuizManagementTab() {
 						<TextInput
 							style={[styles.input, styles.inputMultiline]}
 							placeholder="Die vollständige Definition..."
-							placeholderTextColor={COLORS.textMuted}
+							placeholderTextColor={colors.textMuted}
 							value={newAnswer}
 							onChangeText={setNewAnswer}
 							multiline
@@ -606,16 +642,16 @@ function QuizManagementTab() {
 										<Text style={styles.questionAnswer}>{item.answer}</Text>
 										<View style={styles.questionActions}>
 											<TouchableOpacity
-												style={[styles.qActionBtn, { borderColor: COLORS.accent + '40' }]}
+												style={[styles.qActionBtn, { borderColor: colors.accent + '40' }]}
 												onPress={() => handleStartEdit(item)}
 											>
-												<Text style={[styles.qActionBtnText, { color: COLORS.accent }]}>✏️ Bearbeiten</Text>
+												<Text style={[styles.qActionBtnText, { color: colors.accent }]}>✏️ Bearbeiten</Text>
 											</TouchableOpacity>
 											<TouchableOpacity
-												style={[styles.qActionBtn, { borderColor: COLORS.error + '40' }]}
+												style={[styles.qActionBtn, { borderColor: colors.error + '40' }]}
 												onPress={() => handleDeleteQuestion(item.id, item.query)}
 											>
-												<Text style={[styles.qActionBtnText, { color: COLORS.error }]}>🗑️ Löschen</Text>
+												<Text style={[styles.qActionBtnText, { color: colors.error }]}>🗑️ Löschen</Text>
 											</TouchableOpacity>
 										</View>
 									</View>
@@ -638,7 +674,7 @@ function QuizManagementTab() {
 					onPress={() => setShowNewTopic(!showNewTopic)}
 				>
 					<LinearGradient
-						colors={showNewTopic ? [COLORS.error, '#F87171'] : [COLORS.success, '#34D399']}
+						colors={showNewTopic ? [colors.error, '#F87171'] : [colors.success, '#34D399']}
 						style={styles.newTopicToggleInner}
 					>
 						<Text style={styles.newTopicToggleText}>
@@ -653,7 +689,7 @@ function QuizManagementTab() {
 					onPress={handleImportTopic}
 				>
 					<LinearGradient
-						colors={[COLORS.primary, '#8B5CF6']}
+						colors={[colors.primary, '#8B5CF6']}
 						style={styles.newTopicToggleInner}
 					>
 						<Text style={styles.newTopicToggleText}>
@@ -671,7 +707,7 @@ function QuizManagementTab() {
 					<TextInput
 						style={styles.input}
 						placeholder="z.B. Netzwerk-Grundlagen"
-						placeholderTextColor={COLORS.textMuted}
+						placeholderTextColor={colors.textMuted}
 						value={newTopicName}
 						onChangeText={setNewTopicName}
 					/>
@@ -684,6 +720,29 @@ function QuizManagementTab() {
 				</Card>
 			)}
 
+			{/* EXAM MODE TOGGLE */}
+			<Card style={{ marginBottom: SPACING.md, flexDirection: 'row', alignItems: 'center', backgroundColor: examMode ? colors.primary + '15' : colors.surface, borderColor: examMode ? colors.primary : colors.border, borderWidth: 1 }}>
+				<View style={{ flex: 1 }}>
+					<Text style={{ fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.bold, color: colors.textPrimary }}>🎓 Prüfungsmodus</Text>
+					<Text style={{ color: colors.textSecondary, fontSize: FONTS.sizes.xs, marginTop: 4 }}>
+						Schüler sehen nur "Quiz", und aktive Themen werden strikt nacheinander abgefragt.
+					</Text>
+				</View>
+				<TouchableOpacity
+					style={{ padding: SPACING.sm, marginLeft: SPACING.md }}
+					onPress={async () => {
+						const nextMode = !examMode;
+						setExamModeState(nextMode);
+						await setExamMode(nextMode);
+						if (nextMode) {
+							await setSelectedTopics(activeTopics);
+						}
+					}}
+				>
+					<Text style={{ fontSize: 28 }}>{examMode ? '☑️' : '◻️'}</Text>
+				</TouchableOpacity>
+			</Card>
+
 			{/* Topics list */}
 			{quizNames.length === 0 ? (
 				<EmptyState
@@ -692,10 +751,27 @@ function QuizManagementTab() {
 					subtitle="Erstelle dein erstes Themengebiet mit dem Button oben."
 				/>
 			) : (
-				quizNames.map((name) => (
+				quizNames.map((name) => {
+					const isActive = activeTopics.includes(name);
+					return (
 					<TouchableOpacity key={name} onPress={() => handleSelectTopic(name)} activeOpacity={0.7}>
 						<Card style={styles.topicCard}>
 							<View style={styles.topicCardContent}>
+								{/* Checkbox */}
+								<TouchableOpacity
+									style={{ padding: SPACING.sm, marginRight: SPACING.sm }}
+									onPress={async () => {
+										const newActive = isActive ? activeTopics.filter(t => t !== name) : [...activeTopics, name];
+										setActiveTopics(newActive);
+										await setTeacherTopics(newActive);
+										if (examMode) {
+											await setSelectedTopics(newActive);
+										}
+									}}
+								>
+									<Text style={{ fontSize: 24, paddingBottom: 4 }}>{isActive ? '☑️' : '◻️'}</Text>
+								</TouchableOpacity>
+
 								<View style={styles.topicCardIcon}>
 									<Text style={styles.topicCardEmoji}>📚</Text>
 								</View>
@@ -714,7 +790,8 @@ function QuizManagementTab() {
 							</View>
 						</Card>
 					</TouchableOpacity>
-				))
+					);
+				})
 			)}
 		</>
 	);
@@ -724,6 +801,8 @@ function QuizManagementTab() {
 // MAIN ADMIN SCREEN
 // ============================================================
 export default function AdminScreen({ navigation }) {
+	const { colors, isDark } = useTheme();
+	const styles = useStyles(colors);
 	const [isLoggedIn, setIsLoggedIn] = useState(false);
 	const [activeTab, setActiveTab] = useState('results'); // 'results' | 'quizzes'
 	const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -778,7 +857,7 @@ export default function AdminScreen({ navigation }) {
 
 	// --- DASHBOARD ---
 	return (
-		<LinearGradient colors={[COLORS.background, '#1a0a2e']} style={styles.container}>
+		<LinearGradient colors={isDark ? [colors.background, '#1a0a2e'] : [colors.background, colors.background]} style={styles.container}>
 			<ScrollView contentContainerStyle={styles.dashboardContainer}>
 				<Animated.View style={{ opacity: fadeAnim }}>
 					{/* Header */}
@@ -828,7 +907,7 @@ export default function AdminScreen({ navigation }) {
 							<TextInput
 								style={styles.input}
 								placeholder="Neues Passwort (mind. 4 Zeichen)"
-								placeholderTextColor={COLORS.textMuted}
+								placeholderTextColor={colors.textMuted}
 								value={newPassword}
 								onChangeText={setNewPassword}
 								secureTextEntry
@@ -853,7 +932,7 @@ export default function AdminScreen({ navigation }) {
 // ============================================================
 // STYLES
 // ============================================================
-const styles = StyleSheet.create({
+function useStyles(colors) { return StyleSheet.create({
 	container: { flex: 1 },
 
 	// === LOGIN ===
@@ -862,41 +941,41 @@ const styles = StyleSheet.create({
 	loginIconWrap: { alignItems: 'center', marginBottom: SPACING.xl },
 	loginIcon: { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', ...SHADOWS.lg },
 	loginIconText: { fontSize: 36 },
-	loginTitle: { fontSize: FONTS.sizes.xxxl, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary, textAlign: 'center', marginBottom: SPACING.xs },
-	loginSubtitle: { fontSize: FONTS.sizes.md, color: COLORS.textMuted, textAlign: 'center', marginBottom: SPACING.xxl, lineHeight: 22 },
+	loginTitle: { fontSize: FONTS.sizes.xxxl, fontWeight: FONTS.weights.bold, color: colors.textPrimary, textAlign: 'center', marginBottom: SPACING.xs },
+	loginSubtitle: { fontSize: FONTS.sizes.md, color: colors.textMuted, textAlign: 'center', marginBottom: SPACING.xxl, lineHeight: 22 },
 	loginCard: { padding: SPACING.xl },
-	errorBanner: { backgroundColor: COLORS.error + '20', borderRadius: RADIUS.md, padding: SPACING.md, marginBottom: SPACING.lg, borderWidth: 1, borderColor: COLORS.error + '40' },
-	errorText: { color: COLORS.error, fontSize: FONTS.sizes.sm, textAlign: 'center' },
+	errorBanner: { backgroundColor: colors.error + '20', borderRadius: RADIUS.md, padding: SPACING.md, marginBottom: SPACING.lg, borderWidth: 1, borderColor: colors.error + '40' },
+	errorText: { color: colors.error, fontSize: FONTS.sizes.sm, textAlign: 'center' },
 	backLink: { alignItems: 'center', marginTop: SPACING.xl },
-	backLinkText: { color: COLORS.textMuted, fontSize: FONTS.sizes.sm },
+	backLinkText: { color: colors.textMuted, fontSize: FONTS.sizes.sm },
 
 	// === SHARED ===
-	inputLabel: { fontSize: FONTS.sizes.xs, fontWeight: FONTS.weights.bold, color: COLORS.textMuted, letterSpacing: 1, marginBottom: SPACING.xs, marginTop: SPACING.md },
+	inputLabel: { fontSize: FONTS.sizes.xs, fontWeight: FONTS.weights.bold, color: colors.textMuted, letterSpacing: 1, marginBottom: SPACING.xs, marginTop: SPACING.md },
 	input: {
-		backgroundColor: COLORS.background,
-		borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md,
+		backgroundColor: colors.background,
+		borderWidth: 1, borderColor: colors.border, borderRadius: RADIUS.md,
 		paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md,
-		fontSize: FONTS.sizes.md, color: COLORS.textPrimary,
+		fontSize: FONTS.sizes.md, color: colors.textPrimary,
 	},
 	inputMultiline: { minHeight: 80, textAlignVertical: 'top' },
 
 	// === DASHBOARD ===
 	dashboardContainer: { padding: SPACING.lg, paddingBottom: SPACING.huge },
 	dashHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.lg, paddingTop: SPACING.lg },
-	dashTitle: { fontSize: FONTS.sizes.xxl, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary },
-	dashSubtitle: { fontSize: FONTS.sizes.sm, color: COLORS.textMuted, marginTop: 2 },
-	logoutBtn: { backgroundColor: COLORS.surface, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border },
-	logoutText: { color: COLORS.textSecondary, fontSize: FONTS.sizes.sm },
+	dashTitle: { fontSize: FONTS.sizes.xxl, fontWeight: FONTS.weights.bold, color: colors.textPrimary },
+	dashSubtitle: { fontSize: FONTS.sizes.sm, color: colors.textMuted, marginTop: 2 },
+	logoutBtn: { backgroundColor: colors.surface, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: colors.border },
+	logoutText: { color: colors.textSecondary, fontSize: FONTS.sizes.sm },
 
 	// Tab Switcher
 	tabSwitcher: {
 		flexDirection: 'row',
-		backgroundColor: COLORS.surface,
+		backgroundColor: colors.surface,
 		borderRadius: RADIUS.lg,
 		padding: 4,
 		marginBottom: SPACING.lg,
 		borderWidth: 1,
-		borderColor: COLORS.border,
+		borderColor: colors.border,
 	},
 	tabBtn: {
 		flex: 1,
@@ -905,81 +984,81 @@ const styles = StyleSheet.create({
 		borderRadius: RADIUS.md,
 	},
 	tabBtnActive: {
-		backgroundColor: COLORS.primary,
+		backgroundColor: colors.primary,
 	},
 	tabBtnText: {
 		fontSize: FONTS.sizes.sm,
 		fontWeight: FONTS.weights.semiBold,
-		color: COLORS.textMuted,
+		color: colors.textMuted,
 	},
 	tabBtnTextActive: {
-		color: COLORS.white,
+		color: colors.white,
 	},
 
 	// Password
 	pwToggle: { alignSelf: 'flex-start', marginBottom: SPACING.md },
-	pwToggleText: { color: COLORS.textMuted, fontSize: FONTS.sizes.sm },
+	pwToggleText: { color: colors.textMuted, fontSize: FONTS.sizes.sm },
 	passwordCard: { marginBottom: SPACING.lg },
-	formSectionTitle: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary, marginBottom: SPACING.sm },
+	formSectionTitle: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.bold, color: colors.textPrimary, marginBottom: SPACING.sm },
 
 	// === RESULTS TAB ===
 	statsRow: { flexDirection: 'row', marginBottom: SPACING.lg },
 	actionsRow: { flexDirection: 'row', marginBottom: SPACING.lg, gap: SPACING.sm },
-	actionBtn: { flex: 1, backgroundColor: COLORS.surface, paddingVertical: SPACING.md, borderRadius: RADIUS.md, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
-	actionBtnDanger: { borderColor: COLORS.error + '40' },
-	actionBtnRefresh: { borderColor: COLORS.primary + '40' },
-	actionBtnText: { color: COLORS.textSecondary, fontSize: FONTS.sizes.xs, fontWeight: FONTS.weights.medium },
+	actionBtn: { flex: 1, backgroundColor: colors.surface, paddingVertical: SPACING.md, borderRadius: RADIUS.md, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
+	actionBtnDanger: { borderColor: colors.error + '40' },
+	actionBtnRefresh: { borderColor: colors.primary + '40' },
+	actionBtnText: { color: colors.textSecondary, fontSize: FONTS.sizes.xs, fontWeight: FONTS.weights.medium },
 	filterBar: { marginBottom: SPACING.lg },
-	filterInput: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.full, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.md, fontSize: FONTS.sizes.md, color: COLORS.textPrimary },
+	filterInput: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: RADIUS.full, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.md, fontSize: FONTS.sizes.md, color: colors.textPrimary },
 
 	// Result cards
 	resultCard: { marginBottom: SPACING.md },
 	resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 	resultLeft: { flex: 1 },
-	resultUser: { fontSize: FONTS.sizes.lg, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary, marginBottom: 2 },
-	resultQuiz: { fontSize: FONTS.sizes.sm, color: COLORS.primaryLight, fontWeight: FONTS.weights.medium },
-	resultDate: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted, marginTop: 4 },
+	resultUser: { fontSize: FONTS.sizes.lg, fontWeight: FONTS.weights.bold, color: colors.textPrimary, marginBottom: 2 },
+	resultQuiz: { fontSize: FONTS.sizes.sm, color: colors.primaryLight, fontWeight: FONTS.weights.medium },
+	resultDate: { fontSize: FONTS.sizes.xs, color: colors.textMuted, marginTop: 4 },
 	resultRight: { alignItems: 'center' },
 	scoreBadge: { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderRadius: RADIUS.lg, borderWidth: 1, marginBottom: 4 },
 	scoreBadgeText: { fontSize: FONTS.sizes.xl, fontWeight: FONTS.weights.extraBold },
-	resultScore: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted },
-	expandHint: { fontSize: FONTS.sizes.xs, color: COLORS.textMuted, textAlign: 'center', marginTop: SPACING.sm, fontStyle: 'italic' },
+	resultScore: { fontSize: FONTS.sizes.xs, color: colors.textMuted },
+	expandHint: { fontSize: FONTS.sizes.xs, color: colors.textMuted, textAlign: 'center', marginTop: SPACING.sm, fontStyle: 'italic' },
 
 	// Detail
 	detailSection: { marginTop: SPACING.md },
-	detailDivider: { height: 1, backgroundColor: COLORS.border, marginBottom: SPACING.md },
-	detailSectionTitle: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary, marginBottom: SPACING.md },
+	detailDivider: { height: 1, backgroundColor: colors.border, marginBottom: SPACING.md },
+	detailSectionTitle: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.bold, color: colors.textPrimary, marginBottom: SPACING.md },
 	detailRow: { borderLeftWidth: 3, paddingLeft: SPACING.md, marginBottom: SPACING.md },
 	detailRowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-	detailQuery: { fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.semiBold, color: COLORS.textPrimary, flex: 1, marginRight: SPACING.sm },
-	detailCorrection: { fontSize: FONTS.sizes.xs, color: COLORS.error, marginTop: 4, fontStyle: 'italic' },
-	deleteResultBtn: { alignItems: 'center', paddingVertical: SPACING.md, marginTop: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.border },
-	deleteResultText: { color: COLORS.error, fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.medium },
+	detailQuery: { fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.semiBold, color: colors.textPrimary, flex: 1, marginRight: SPACING.sm },
+	detailCorrection: { fontSize: FONTS.sizes.xs, color: colors.error, marginTop: 4, fontStyle: 'italic' },
+	deleteResultBtn: { alignItems: 'center', paddingVertical: SPACING.md, marginTop: SPACING.sm, borderTopWidth: 1, borderTopColor: colors.border },
+	deleteResultText: { color: colors.error, fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.medium },
 
 	// === QUIZ MANAGEMENT TAB ===
 	// New topic
 	newTopicToggle: { borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SPACING.md },
 	newTopicToggleInner: { paddingVertical: SPACING.md, alignItems: 'center', borderRadius: RADIUS.md },
-	newTopicToggleText: { color: COLORS.white, fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.bold },
+	newTopicToggleText: { color: colors.white, fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.bold },
 	newTopicCard: { marginBottom: SPACING.lg },
 
 	// Topic cards
 	topicCard: { marginBottom: SPACING.md },
 	topicCardContent: { flexDirection: 'row', alignItems: 'center' },
-	topicCardIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: COLORS.primary + '20', alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
+	topicCardIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
 	topicCardEmoji: { fontSize: 24 },
-	topicCardTitle: { fontSize: FONTS.sizes.lg, fontWeight: FONTS.weights.semiBold, color: COLORS.textPrimary },
-	topicCardDesc: { fontSize: FONTS.sizes.sm, color: COLORS.textMuted, marginTop: 2 },
+	topicCardTitle: { fontSize: FONTS.sizes.lg, fontWeight: FONTS.weights.semiBold, color: colors.textPrimary },
+	topicCardDesc: { fontSize: FONTS.sizes.sm, color: colors.textMuted, marginTop: 2 },
 	topicDeleteBtn: { padding: SPACING.sm, marginRight: SPACING.sm },
 	topicDeleteText: { fontSize: 18 },
-	topicCardArrow: { fontSize: FONTS.sizes.xxl, color: COLORS.primary, fontWeight: FONTS.weights.bold },
+	topicCardArrow: { fontSize: FONTS.sizes.xxl, color: colors.primary, fontWeight: FONTS.weights.bold },
 
 	// Topic detail
 	backBtn: { marginBottom: SPACING.md },
-	backBtnText: { color: COLORS.primaryLight, fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.medium },
+	backBtnText: { color: colors.primaryLight, fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.medium },
 	topicDetailHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: SPACING.lg, flexWrap: 'wrap' },
-	topicDetailTitle: { fontSize: FONTS.sizes.xxl, fontWeight: FONTS.weights.bold, color: COLORS.textPrimary },
-	topicDetailCount: { fontSize: FONTS.sizes.sm, color: COLORS.textMuted, marginTop: 2 },
+	topicDetailTitle: { fontSize: FONTS.sizes.xxl, fontWeight: FONTS.weights.bold, color: colors.textPrimary },
+	topicDetailCount: { fontSize: FONTS.sizes.sm, color: colors.textMuted, marginTop: 2 },
 	topicDetailActions: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm },
 	topicActionBtn: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1 },
 	topicActionBtnText: { fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.medium },
@@ -990,14 +1069,15 @@ const styles = StyleSheet.create({
 	// Question cards
 	questionCard: { marginBottom: SPACING.md },
 	questionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm },
-	questionNumber: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.primary + '25', alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
-	questionNumberText: { color: COLORS.primaryLight, fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.bold },
-	questionQuery: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semiBold, color: COLORS.textPrimary },
-	questionAnswer: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, lineHeight: 20, marginBottom: SPACING.md, paddingLeft: 44 },
+	questionNumber: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '25', alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
+	questionNumberText: { color: colors.primaryLight, fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.bold },
+	questionQuery: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semiBold, color: colors.textPrimary },
+	questionAnswer: { fontSize: FONTS.sizes.sm, color: colors.textSecondary, lineHeight: 20, marginBottom: SPACING.md, paddingLeft: 44 },
 	questionActions: { flexDirection: 'row', gap: SPACING.sm, paddingLeft: 44 },
-	qActionBtn: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border },
+	qActionBtn: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: colors.border },
 	qActionBtnText: { fontSize: FONTS.sizes.xs, fontWeight: FONTS.weights.medium },
 
 	// Edit
 	editButtonRow: { flexDirection: 'row', marginTop: SPACING.md },
 });
+}

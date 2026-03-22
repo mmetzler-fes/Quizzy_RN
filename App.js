@@ -6,13 +6,14 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { initDatabase } from './src/database/database';
+import { initDatabase, getExamMode } from './src/database/database';
 import { LoadingView } from './src/components/UI';
 import { COLORS, FONTS, SPACING, RADIUS } from './src/styles/theme';
 
 import LoginScreen from './src/screens/LoginScreen';
 import QuizScreen from './src/screens/QuizScreen';
 import QuizManageScreen from './src/screens/QuizManageScreen';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 import VokabelLearnScreen from './src/screens/VokabelLearnScreen';
 import AdminScreen from './src/screens/AdminScreen';
@@ -21,12 +22,14 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function TabIcon({ emoji, label, focused }) {
+  const { colors } = useTheme();
+
   return (
-    <View style={[tabStyles.tabItem, focused && tabStyles.tabItemActive]}>
+    <View style={[tabStyles.tabItem, focused && { backgroundColor: colors.primary + '20' }]}>
       <Text style={[tabStyles.tabEmoji, focused && tabStyles.tabEmojiActive]}>
         {emoji}
       </Text>
-      <Text style={[tabStyles.tabLabel, focused && tabStyles.tabLabelActive]}>
+      <Text style={[tabStyles.tabLabel, focused && { color: colors.primaryLight, fontWeight: FONTS.weights.bold }, !focused && { color: colors.textMuted }]}>
         {label}
       </Text>
     </View>
@@ -35,12 +38,33 @@ function TabIcon({ emoji, label, focused }) {
 
 function MainTabs({ route }) {
   const username = route?.params?.username || 'Spieler';
+  const [isExamMode, setIsExamMode] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const { colors } = useTheme();
+
+  useEffect(() => {
+    async function checkExamMode() {
+      try {
+        const mode = await getExamMode();
+        setIsExamMode(mode);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    checkExamMode();
+  }, []);
+
+  if (loading) {
+    return <LoadingView message="Struktur wird geladen..." />;
+  }
 
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: tabStyles.tabBar,
+        tabBarStyle: [tabStyles.tabBar, { backgroundColor: colors.surface, borderTopColor: colors.border }],
         tabBarShowLabel: false,
         tabBarHideOnKeyboard: true,
       }}
@@ -55,25 +79,29 @@ function MainTabs({ route }) {
           ),
         }}
       />
-      <Tab.Screen
-        name="QuizVerwalten"
-        component={QuizManageScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="📋" label="Verwalten" focused={focused} />
-          ),
-        }}
-      />
+      {!isExamMode && (
+        <Tab.Screen
+          name="QuizVerwalten"
+          component={QuizManageScreen}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon emoji="📋" label="Verwalten" focused={focused} />
+            ),
+          }}
+        />
+      )}
 
-      <Tab.Screen
-        name="VokabelLernen"
-        component={VokabelLearnScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="🎓" label="Lernen" focused={focused} />
-          ),
-        }}
-      />
+      {!isExamMode && (
+        <Tab.Screen
+          name="VokabelLernen"
+          component={VokabelLearnScreen}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon emoji="🎓" label="Lernen" focused={focused} />
+            ),
+          }}
+        />
+      )}
       <Tab.Screen
         name="Abmelden"
         component={View}
@@ -93,8 +121,9 @@ function MainTabs({ route }) {
   );
 }
 
-export default function App() {
+function AppContent() {
   const [dbReady, setDbReady] = useState(false);
+  const { colors, isDark } = useTheme();
 
   useEffect(() => {
     async function init() {
@@ -114,12 +143,12 @@ export default function App() {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       <NavigationContainer>
         <Stack.Navigator
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: COLORS.background },
+            contentStyle: { backgroundColor: colors.background },
             animation: 'fade',
           }}
         >
@@ -129,6 +158,14 @@ export default function App() {
         </Stack.Navigator>
       </NavigationContainer>
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 

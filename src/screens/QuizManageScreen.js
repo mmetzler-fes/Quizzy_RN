@@ -9,11 +9,14 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 import { LoadingView, EmptyState } from '../components/UI';
-import { getQuizNames, getSelectedTopics, setSelectedTopics } from '../database/database';
+import { getQuizNames, getSelectedTopics, setSelectedTopics, getTeacherTopics } from '../database/database';
 
 export default function QuizManageScreen() {
+	const { colors, isDark } = useTheme();
+	const styles = useStyles(colors);
 	const [allTopics, setAllTopics] = useState([]);
 	const [selected, setSelected] = useState(new Set()); // selected topic names
 	const [loading, setLoading] = useState(true);
@@ -26,15 +29,18 @@ export default function QuizManageScreen() {
 
 	const loadData = async () => {
 		try {
-			const topics = await getQuizNames();
-			setAllTopics(topics);
+			// The only topics a student can choose from are the ones the teacher allowed
+			const teacherTopics = await getTeacherTopics();
+			const availableTopics = teacherTopics;
+			setAllTopics(availableTopics);
 
-			// Load saved selection; if none saved → select all by default
+			// Load saved selection; if none saved → select all allowed by default
 			const topicsFromApi = await getSelectedTopics();
-			if (topicsFromApi) {
-				setSelected(new Set(topicsFromApi));
+			if (topicsFromApi && topicsFromApi.length > 0) {
+				const valid = topicsFromApi.filter(t => availableTopics.includes(t));
+				setSelected(new Set(valid));
 			} else {
-				setSelected(new Set(topics)); // all selected by default
+				setSelected(new Set(availableTopics)); 
 			}
 		} catch (e) {
 			console.error(e);
@@ -84,12 +90,12 @@ export default function QuizManageScreen() {
 	const noneChecked = allTopics.every(t => !selected.has(t));
 
 	return (
-		<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
+		<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 
 			{/* Header */}
 			<View style={styles.header}>
-				<Text style={styles.title}>📋 Themen auswählen</Text>
-				<Text style={styles.subtitle}>
+				<Text style={[styles.title, { color: colors.textPrimary }]}>📋 Themen auswählen</Text>
+				<Text style={[styles.subtitle, { color: colors.textMuted }]}>
 					Wähle aus, welche Themen im Quiz abgefragt werden sollen.
 				</Text>
 			</View>
@@ -139,15 +145,15 @@ export default function QuizManageScreen() {
 								activeOpacity={0.7}
 							>
 								{/* Checkbox */}
-								<View style={[styles.checkbox, isChecked && styles.checkboxChecked]}>
+								<View style={[styles.checkbox, { backgroundColor: colors.background, borderColor: colors.border }, isChecked && { borderColor: colors.primary, backgroundColor: colors.primary }]}>
 									{isChecked && <Text style={styles.checkmark}>✓</Text>}
 								</View>
 
 								{/* Topic icon + name */}
-								<View style={styles.topicIcon}>
+								<View style={[styles.topicIcon, { backgroundColor: colors.primary + '20' }]}>
 									<Text style={styles.topicEmoji}>📚</Text>
 								</View>
-								<Text style={[styles.topicName, isChecked && styles.topicNameChecked]}>
+								<Text style={[styles.topicName, { color: colors.textSecondary }, isChecked && { color: colors.textPrimary }]}>
 									{name}
 								</Text>
 							</TouchableOpacity>
@@ -158,15 +164,15 @@ export default function QuizManageScreen() {
 
 			{/* Saved toast */}
 			{showSaved && (
-				<Animated.View style={[styles.savedToast, { opacity: savedAnim }]}>
-					<Text style={styles.savedToastText}>✓ Gespeichert</Text>
+				<Animated.View style={[styles.savedToast, { opacity: savedAnim, backgroundColor: colors.success }]}>
+					<Text style={[styles.savedToastText, { color: colors.white }]}>✓ Gespeichert</Text>
 				</Animated.View>
 			)}
 		</LinearGradient>
 	);
 }
 
-const styles = StyleSheet.create({
+function useStyles(colors) { return StyleSheet.create({
 	container: { flex: 1 },
 
 	header: {
@@ -177,12 +183,12 @@ const styles = StyleSheet.create({
 	title: {
 		fontSize: FONTS.sizes.xxl,
 		fontWeight: FONTS.weights.bold,
-		color: COLORS.textPrimary,
+		color: colors.textPrimary,
 		marginBottom: SPACING.xs,
 	},
 	subtitle: {
 		fontSize: FONTS.sizes.sm,
-		color: COLORS.textMuted,
+		color: colors.textMuted,
 		lineHeight: 18,
 	},
 
@@ -198,25 +204,18 @@ const styles = StyleSheet.create({
 		paddingHorizontal: SPACING.md,
 		borderRadius: RADIUS.full,
 		borderWidth: 1,
-		borderColor: COLORS.border,
-		backgroundColor: COLORS.surface,
 		alignItems: 'center',
 	},
 	bulkBtnActive: {
-		borderColor: COLORS.success + '80',
-		backgroundColor: COLORS.success + '15',
 	},
 	bulkBtnDanger: {
-		borderColor: COLORS.error + '80',
-		backgroundColor: COLORS.error + '15',
 	},
 	bulkBtnText: {
 		fontSize: FONTS.sizes.sm,
-		color: COLORS.textMuted,
 		fontWeight: FONTS.weights.medium,
 	},
-	bulkBtnTextActive: { color: COLORS.success },
-	bulkBtnTextDanger: { color: COLORS.error },
+	bulkBtnTextActive: { color: colors.success },
+	bulkBtnTextDanger: { color: colors.error },
 
 	listContent: {
 		paddingHorizontal: SPACING.xl,
@@ -226,17 +225,13 @@ const styles = StyleSheet.create({
 	topicRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		backgroundColor: COLORS.surface,
 		borderRadius: RADIUS.lg,
 		padding: SPACING.lg,
 		marginBottom: SPACING.md,
 		borderWidth: 1.5,
-		borderColor: COLORS.border,
 		...SHADOWS.sm,
 	},
 	topicRowChecked: {
-		borderColor: COLORS.primary + '80',
-		backgroundColor: COLORS.primary + '12',
 	},
 
 	checkbox: {
@@ -244,19 +239,14 @@ const styles = StyleSheet.create({
 		height: 24,
 		borderRadius: 6,
 		borderWidth: 2,
-		borderColor: COLORS.border,
-		backgroundColor: COLORS.background,
 		alignItems: 'center',
 		justifyContent: 'center',
 		marginRight: SPACING.md,
 		flexShrink: 0,
 	},
 	checkboxChecked: {
-		borderColor: COLORS.primary,
-		backgroundColor: COLORS.primary,
 	},
 	checkmark: {
-		color: COLORS.white,
 		fontSize: 14,
 		fontWeight: FONTS.weights.bold,
 		lineHeight: 16,
@@ -266,7 +256,6 @@ const styles = StyleSheet.create({
 		width: 36,
 		height: 36,
 		borderRadius: RADIUS.md,
-		backgroundColor: COLORS.primary + '20',
 		alignItems: 'center',
 		justifyContent: 'center',
 		marginRight: SPACING.md,
@@ -278,25 +267,22 @@ const styles = StyleSheet.create({
 		flex: 1,
 		fontSize: FONTS.sizes.md,
 		fontWeight: FONTS.weights.semiBold,
-		color: COLORS.textSecondary,
 	},
 	topicNameChecked: {
-		color: COLORS.textPrimary,
 	},
 
 	savedToast: {
 		position: 'absolute',
 		bottom: SPACING.xxl,
 		alignSelf: 'center',
-		backgroundColor: COLORS.success,
 		paddingHorizontal: SPACING.xl,
 		paddingVertical: SPACING.sm,
 		borderRadius: RADIUS.full,
 		...SHADOWS.md,
 	},
 	savedToastText: {
-		color: COLORS.white,
 		fontWeight: FONTS.weights.bold,
 		fontSize: FONTS.sizes.sm,
 	},
 });
+}

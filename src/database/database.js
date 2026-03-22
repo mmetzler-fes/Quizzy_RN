@@ -119,14 +119,46 @@ export async function updateAdminPassword(newPassword) {
 export async function getSelectedTopics() {
   const res = await fetch(`${getBaseUrl()}/selectedTopics`);
   const data = await res.json();
-  return data.selectedTopics;
+  return data.selectedTopics || [];
 }
 
 export async function setSelectedTopics(topics) {
-  await fetch(`${getBaseUrl()}/selectedTopics`, {
+  const res = await fetch(`${getBaseUrl()}/selectedTopics`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ selectedTopics: topics })
+  });
+  return await res.json();
+}
+
+export async function getTeacherTopics() {
+  const res = await fetch(`${getBaseUrl()}/teacherTopics`);
+  const data = await res.json();
+  return data.teacherTopics || [];
+}
+
+export async function setTeacherTopics(topics) {
+  const res = await fetch(`${getBaseUrl()}/teacherTopics`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ teacherTopics: topics })
+  });
+  return await res.json();
+}
+
+// === EXAM MODE ===
+
+export async function getExamMode() {
+  const res = await fetch(`${getBaseUrl()}/examMode`);
+  const data = await res.json();
+  return data.examMode;
+}
+
+export async function setExamMode(mode) {
+  await fetch(`${getBaseUrl()}/examMode`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ examMode: mode })
   });
 }
 
@@ -153,4 +185,9 @@ export async function deleteQuizResult(id) {
 
 export async function deleteAllQuizResults() {
   await fetch(`${getBaseUrl()}/quizResultsAll`, { method: 'DELETE' });
+}
+
+export async function getNetworkInfo() {
+  const res = await fetch(`${getBaseUrl()}/networkInfo`);
+  return await res.json();
 }

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import {
 	View,
 	Text,
@@ -9,42 +10,92 @@ import {
 	Platform,
 	TouchableOpacity,
 	ScrollView,
+	ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
+import QRCode from 'react-native-qrcode-svg';
+import { getNetworkInfo } from '../database/database';
 import { GradientButton, StyledInput } from '../components/UI';
 
 const { width, height } = Dimensions.get('window');
 
 export default function LoginScreen({ navigation }) {
+	const isFocused = useIsFocused();
 	const [username, setUsername] = useState('');
+	const [networkUrl, setNetworkUrl] = useState('');
+	const [wifiIps, setWifiIps] = useState([]);
+	const [privateLanIps, setPrivateLanIps] = useState([]);
+	const [networkLoading, setNetworkLoading] = useState(false);
+	const { colors, isDark, toggleTheme } = useTheme();
 	const fadeAnim = useRef(new Animated.Value(0)).current;
 	const slideAnim = useRef(new Animated.Value(50)).current;
 	const logoScale = useRef(new Animated.Value(0.5)).current;
 	const glowAnim = useRef(new Animated.Value(0)).current;
 
 	useEffect(() => {
-		Animated.sequence([
-			Animated.parallel([
-				Animated.spring(logoScale, {
-					toValue: 1,
-					friction: 4,
-					tension: 40,
+		if (isFocused) {
+			Animated.sequence([
+				Animated.parallel([
+					Animated.spring(logoScale, {
+						toValue: 1,
+						friction: 4,
+						tension: 40,
+						useNativeDriver: true,
+					}),
+					Animated.timing(fadeAnim, {
+						toValue: 1,
+						duration: 800,
+						useNativeDriver: true,
+					}),
+				]),
+				Animated.timing(slideAnim, {
+					toValue: 0,
+					duration: 500,
 					useNativeDriver: true,
 				}),
-				Animated.timing(fadeAnim, {
-					toValue: 1,
-					duration: 800,
-					useNativeDriver: true,
-				}),
-			]),
-			Animated.timing(slideAnim, {
-				toValue: 0,
-				duration: 500,
-				useNativeDriver: true,
-			}),
-		]).start();
+			]).start();
+		}
+	}, [isFocused]);
 
+	useEffect(() => {
+		let isMounted = true;
+
+		async function loadNetworkInfo() {
+			setNetworkLoading(true);
+			try {
+				const info = await getNetworkInfo();
+				if (!isMounted) return;
+
+				const wifi = Array.isArray(info?.wifiIps) ? info.wifiIps : [];
+				const privateIps = Array.isArray(info?.privateLanIps) ? info.privateLanIps : [];
+				const urls = Array.isArray(info?.urls) ? info.urls : [];
+
+				setWifiIps(wifi);
+				setPrivateLanIps(privateIps);
+				setNetworkUrl(urls.length > 0 ? urls[0] : '');
+			} catch (error) {
+				if (isMounted) {
+					setWifiIps([]);
+					setPrivateLanIps([]);
+					setNetworkUrl('');
+				}
+			} finally {
+				if (isMounted) setNetworkLoading(false);
+			}
+		}
+
+		if (isFocused) {
+			loadNetworkInfo();
+		}
+
+		return () => {
+			isMounted = false;
+		};
+	}, [isFocused]);
+
+	useEffect(() => {
 		// Pulsing glow animation
 		Animated.loop(
 			Animated.sequence([
@@ -70,11 +121,15 @@ export default function LoginScreen({ navigation }) {
 
 	return (
 		<LinearGradient
-			colors={[COLORS.background, '#1a1040', COLORS.background]}
+			colors={isDark 
+				? [colors.background, '#1a1040', colors.background] 
+				: [colors.background, colors.primarySoft, colors.background]
+			}
 			style={styles.container}
 		>
 			<KeyboardAvoidingView
 				behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+				enabled={Platform.OS !== 'web'}
 				style={{ flex: 1 }}
 			>
 				<ScrollView
@@ -82,9 +137,23 @@ export default function LoginScreen({ navigation }) {
 					showsVerticalScrollIndicator={false}
 					keyboardShouldPersistTaps="handled"
 				>
+					{/* Theme Toggle Button */}
+					<TouchableOpacity
+						style={{ position: 'absolute', top: 50, right: 30, zIndex: 100, padding: 10, backgroundColor: colors.surfaceLight, borderRadius: 20 }}
+						onPress={toggleTheme}
+					>
+						<Text style={{ fontSize: 24 }}>{isDark ? '☀️' : '🌙'}</Text>
+					</TouchableOpacity>
+
 					{/* Decorative circles */}
-					<Animated.View style={[styles.decorCircle1, { opacity: glowAnim }]} />
-					<Animated.View style={[styles.decorCircle2, { opacity: Animated.subtract(1, glowAnim) }]} />
+					<Animated.View 
+						pointerEvents="none" 
+						style={[styles.decorCircle1, { opacity: glowAnim, backgroundColor: colors.primary }]} 
+					/>
+					<Animated.View 
+						pointerEvents="none" 
+						style={[styles.decorCircle2, { opacity: Animated.subtract(1, glowAnim) }]} 
+					/>
 
 					{/* Logo */}
 					<Animated.View
@@ -97,13 +166,13 @@ export default function LoginScreen({ navigation }) {
 						]}
 					>
 						<LinearGradient
-							colors={[COLORS.primary, '#8B5CF6']}
+							colors={[colors.primary, '#8B5CF6']}
 							style={styles.logoGradient}
 						>
 							<Text style={styles.logoEmoji}>🧠</Text>
 						</LinearGradient>
-						<Text style={styles.title}>Quizzy</Text>
-						<Text style={styles.subtitle}>Lerne smarter, nicht härter</Text>
+						<Text style={[styles.title, { color: colors.textPrimary }]}>Quizzy</Text>
+						<Text style={[styles.subtitle, { color: colors.textSecondary }]}>Lerne smarter, nicht härter</Text>
 					</Animated.View>
 
 					{/* Login Form */}
@@ -116,9 +185,9 @@ export default function LoginScreen({ navigation }) {
 							},
 						]}
 					>
-						<View style={styles.formCard}>
-							<Text style={styles.welcomeText}>Willkommen!</Text>
-							<Text style={styles.instructionText}>
+						<View style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+							<Text style={[styles.welcomeText, { color: colors.textPrimary }]}>Willkommen!</Text>
+							<Text style={[styles.instructionText, { color: colors.textMuted }]}>
 								Gib deinen Namen ein, um loszulegen
 							</Text>
 
@@ -139,14 +208,39 @@ export default function LoginScreen({ navigation }) {
 								style={styles.loginButton}
 							/>
 
-							<View style={styles.divider} />
+							{networkLoading && (
+								<View style={[styles.networkCard, { borderColor: colors.border, backgroundColor: colors.surfaceLight }]}> 
+									<ActivityIndicator size="small" color={colors.primary} />
+									<Text style={[styles.networkHintText, { color: colors.textMuted }]}>WLAN wird geprueft ...</Text>
+								</View>
+							)}
+
+							{!networkLoading && !!networkUrl && (
+								<View style={[styles.networkCard, { borderColor: colors.border, backgroundColor: colors.surfaceLight }]}> 
+									<Text style={[styles.networkTitle, { color: colors.textPrimary }]}>App per WLAN oeffnen</Text>
+									<QRCode value={networkUrl} size={140} color={colors.textPrimary} backgroundColor="transparent" />
+									<Text style={[styles.networkUrlText, { color: colors.primary }]}>{networkUrl}</Text>
+									{wifiIps.length > 1 && (
+										<Text style={[styles.networkHintText, { color: colors.textMuted }]}>Weitere WLAN-IPs: {wifiIps.slice(1).join(', ')}</Text>
+									)}
+									{privateLanIps.length > 0 && (
+										<Text style={[styles.networkHintText, { color: colors.textMuted }]}>Weitere private LAN-IPs: {privateLanIps.join(', ')}</Text>
+									)}
+								</View>
+							)}
+
+							<View style={[styles.divider, { backgroundColor: colors.border }]} />
 
 							<TouchableOpacity
 								onPress={() => navigation.navigate('Admin')}
-								style={styles.adminLink}
+								style={[styles.adminLink, { borderColor: colors.error + '40', backgroundColor: colors.error + '10' }]}
 							>
-								<Text style={styles.adminLinkText}>🔐 Zum Lehrer-Bereich</Text>
+								<Text style={[styles.adminLinkText, { color: colors.error }]}>🔐 Zum Lehrer-Bereich</Text>
 							</TouchableOpacity>
+
+							<Text style={[styles.creditText, { color: colors.textMuted }]}>
+								Designed by Martin Metzler, implementation assisted by AI.
+							</Text>
 						</View>
 					</Animated.View>
 				</ScrollView>
@@ -217,6 +311,7 @@ const styles = StyleSheet.create({
 	formContainer: {
 		width: '100%',
 		maxWidth: 400,
+		zIndex: 10,
 	},
 	formCard: {
 		backgroundColor: COLORS.surface,
@@ -236,6 +331,27 @@ const styles = StyleSheet.create({
 		fontSize: FONTS.sizes.md,
 		color: COLORS.textMuted,
 		marginBottom: SPACING.xxl,
+	},
+	networkCard: {
+		marginTop: SPACING.lg,
+		borderWidth: 1,
+		borderRadius: RADIUS.lg,
+		padding: SPACING.md,
+		alignItems: 'center',
+		gap: SPACING.sm,
+	},
+	networkTitle: {
+		fontSize: FONTS.sizes.md,
+		fontWeight: FONTS.weights.bold,
+	},
+	networkUrlText: {
+		fontSize: FONTS.sizes.sm,
+		fontWeight: FONTS.weights.bold,
+		textAlign: 'center',
+	},
+	networkHintText: {
+		fontSize: FONTS.sizes.xs,
+		textAlign: 'center',
 	},
 	loginButton: {
 		marginTop: SPACING.sm,
@@ -259,5 +375,11 @@ const styles = StyleSheet.create({
 		color: COLORS.error,
 		fontSize: FONTS.sizes.sm,
 		fontWeight: FONTS.weights.bold,
+	},
+	creditText: {
+		fontSize: FONTS.sizes.xs,
+		textAlign: 'center',
+		marginTop: SPACING.lg,
+		opacity: 0.5,
 	},
 });

@@ -8,10 +8,11 @@ import {
 	Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 import { useFocusEffect } from '@react-navigation/native';
-import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../styles/theme';
 import { Card, GradientButton, Badge, LoadingView, EmptyState } from '../components/UI';
-import { getAllQuizItems, getQuizByName, getQuizNames, getSelectedTopics } from '../database/database';
+import { getAllQuizItems, getQuizByName, getQuizNames, getSelectedTopics, getTeacherTopics } from '../database/database';
 
 function shuffle(array) {
 	const arr = [...array];
@@ -23,6 +24,8 @@ function shuffle(array) {
 }
 
 export default function VokabelLearnScreen() {
+	const { colors, isDark } = useTheme();
+	const styles = useStyles(colors);
 	const [vokabeln, setVokabeln] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [currentIndex, setCurrentIndex] = useState(0);
@@ -50,20 +53,20 @@ export default function VokabelLearnScreen() {
 
 	const loadData = async () => {
 		try {
-			const selectedTopics = await getSelectedTopics();
-			let data;
-			if (selectedTopics === null) {
-				// Fallback: load everything on first run
-				data = await getAllQuizItems();
-			} else if (selectedTopics.length > 0) {
-				// Load items only from selected topics
+			const teacherTopics = await getTeacherTopics();
+			const studentTopics = await getSelectedTopics();
+			
+			let activeTopics = teacherTopics; // Fallback: alle erlaubten Themen
+			if (studentTopics && studentTopics.length > 0) {
+				activeTopics = teacherTopics.filter(n => studentTopics.includes(n));
+			}
+
+			let data = [];
+			if (activeTopics.length > 0) {
 				const allItems = await Promise.all(
-					selectedTopics.map(name => getQuizByName(name))
+					activeTopics.map(name => getQuizByName(name))
 				);
 				data = allItems.flat();
-			} else {
-				// Explicitly none selected
-				data = [];
 			}
 			setVokabeln(shuffle(data));
 		} catch (error) {
@@ -121,7 +124,7 @@ export default function VokabelLearnScreen() {
 
 	if (vokabeln.length === 0) {
 		return (
-			<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
+			<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 				<EmptyState
 					icon="📖"
 					title="Keine Einträge"
@@ -137,7 +140,7 @@ export default function VokabelLearnScreen() {
 		const percentage = Math.round((score.correct / total) * 100);
 
 		return (
-			<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
+			<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 				<ScrollView contentContainerStyle={styles.resultContainer}>
 					<Text style={styles.resultEmoji}>
 						{percentage >= 80 ? '🎉' : percentage >= 50 ? '👍' : '📚'}
@@ -149,16 +152,16 @@ export default function VokabelLearnScreen() {
 
 					<View style={styles.resultCircle}>
 						<Text style={[styles.resultPercent, {
-							color: percentage >= 80 ? COLORS.success : percentage >= 50 ? COLORS.accent : COLORS.error
+							color: percentage >= 80 ? colors.success : percentage >= 50 ? colors.accent : colors.error
 						}]}>{percentage}%</Text>
 					</View>
 
 					<View style={styles.resultStats}>
-						<View style={[styles.resultStat, { borderLeftColor: COLORS.success }]}>
+						<View style={[styles.resultStat, { borderLeftColor: colors.success }]}>
 							<Text style={styles.resultStatNum}>{score.correct}</Text>
 							<Text style={styles.resultStatLabel}>Gewusst ✅</Text>
 						</View>
-						<View style={[styles.resultStat, { borderLeftColor: COLORS.error }]}>
+						<View style={[styles.resultStat, { borderLeftColor: colors.error }]}>
 							<Text style={styles.resultStatNum}>{score.wrong}</Text>
 							<Text style={styles.resultStatLabel}>Nicht gewusst ❌</Text>
 						</View>
@@ -188,8 +191,12 @@ export default function VokabelLearnScreen() {
 		outputRange: ['180deg', '360deg'],
 	});
 
+	const flashcardColors = showAnswer
+		? (isDark ? ['#1E293B', '#334155'] : [colors.surface, colors.surfaceLight])
+		: [colors.primary + '20', colors.primary + '10'];
+
 	return (
-		<LinearGradient colors={[COLORS.background, '#1a1040']} style={styles.container}>
+		<LinearGradient colors={isDark ? [colors.background, '#1a1040'] : [colors.background, colors.background] } style={styles.container}>
 			<View style={styles.learnContainer}>
 				{/* Progress */}
 				<View style={styles.progressHeader}>
@@ -205,7 +212,7 @@ export default function VokabelLearnScreen() {
 				{/* Progress bar */}
 				<View style={styles.progressBar}>
 					<LinearGradient
-						colors={[COLORS.primary, '#8B5CF6']}
+						colors={[colors.primary, '#8B5CF6']}
 						start={{ x: 0, y: 0 }}
 						end={{ x: 1, y: 0 }}
 						style={[styles.progressFill, { width: `${progress * 100}%` }]}
@@ -230,7 +237,7 @@ export default function VokabelLearnScreen() {
 						]}
 					>
 						<LinearGradient
-							colors={showAnswer ? ['#1E293B', '#334155'] : [COLORS.primary + '20', COLORS.primary + '10']}
+							colors={flashcardColors}
 							style={styles.flashcardInner}
 						>
 							<Text style={styles.flashcardLabel}>
@@ -268,7 +275,7 @@ export default function VokabelLearnScreen() {
 	);
 }
 
-const styles = StyleSheet.create({
+function useStyles(colors) { return StyleSheet.create({
 	container: {
 		flex: 1,
 	},
@@ -286,7 +293,7 @@ const styles = StyleSheet.create({
 	},
 	progressText: {
 		fontSize: FONTS.sizes.md,
-		color: COLORS.textSecondary,
+		color: colors.textSecondary,
 		fontWeight: FONTS.weights.medium,
 	},
 	scoreRow: {
@@ -295,17 +302,17 @@ const styles = StyleSheet.create({
 	},
 	scoreGreen: {
 		fontSize: FONTS.sizes.md,
-		color: COLORS.success,
+		color: colors.success,
 		fontWeight: FONTS.weights.bold,
 	},
 	scoreRed: {
 		fontSize: FONTS.sizes.md,
-		color: COLORS.error,
+		color: colors.error,
 		fontWeight: FONTS.weights.bold,
 	},
 	progressBar: {
 		height: 6,
-		backgroundColor: COLORS.surface,
+		backgroundColor: colors.surface,
 		borderRadius: 3,
 		marginBottom: SPACING.xxl,
 		overflow: 'hidden',
@@ -332,11 +339,11 @@ const styles = StyleSheet.create({
 		minHeight: 250,
 		borderRadius: RADIUS.xl,
 		borderWidth: 1,
-		borderColor: COLORS.border,
+		borderColor: colors.border,
 	},
 	flashcardLabel: {
 		fontSize: FONTS.sizes.sm,
-		color: COLORS.textMuted,
+		color: colors.textMuted,
 		marginBottom: SPACING.xl,
 		letterSpacing: 1,
 		textTransform: 'uppercase',
@@ -344,13 +351,13 @@ const styles = StyleSheet.create({
 	flashcardText: {
 		fontSize: FONTS.sizes.xl,
 		fontWeight: FONTS.weights.bold,
-		color: COLORS.textPrimary,
+		color: colors.textPrimary,
 		textAlign: 'center',
 		lineHeight: 30,
 	},
 	flashcardHint: {
 		fontSize: FONTS.sizes.sm,
-		color: COLORS.textMuted,
+		color: colors.textMuted,
 		marginTop: SPACING.xl,
 		fontStyle: 'italic',
 	},
@@ -374,12 +381,12 @@ const styles = StyleSheet.create({
 	resultTitle: {
 		fontSize: FONTS.sizes.xxxl,
 		fontWeight: FONTS.weights.bold,
-		color: COLORS.textPrimary,
+		color: colors.textPrimary,
 		marginBottom: SPACING.sm,
 	},
 	resultSubtitle: {
 		fontSize: FONTS.sizes.lg,
-		color: COLORS.textSecondary,
+		color: colors.textSecondary,
 		textAlign: 'center',
 		marginBottom: SPACING.xxl,
 	},
@@ -388,10 +395,10 @@ const styles = StyleSheet.create({
 		height: 120,
 		borderRadius: 60,
 		borderWidth: 4,
-		borderColor: COLORS.primary,
+		borderColor: colors.primary,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: COLORS.surface,
+		backgroundColor: colors.surface,
 		marginBottom: SPACING.xxl,
 		...SHADOWS.lg,
 	},
@@ -407,22 +414,23 @@ const styles = StyleSheet.create({
 	},
 	resultStat: {
 		flex: 1,
-		backgroundColor: COLORS.surface,
+		backgroundColor: colors.surface,
 		borderRadius: RADIUS.lg,
 		padding: SPACING.lg,
 		borderWidth: 1,
-		borderColor: COLORS.border,
+		borderColor: colors.border,
 		borderLeftWidth: 3,
 		alignItems: 'center',
 	},
 	resultStatNum: {
 		fontSize: FONTS.sizes.xxxl,
 		fontWeight: FONTS.weights.bold,
-		color: COLORS.textPrimary,
+		color: colors.textPrimary,
 	},
 	resultStatLabel: {
 		fontSize: FONTS.sizes.sm,
-		color: COLORS.textMuted,
+		color: colors.textMuted,
 		marginTop: SPACING.xs,
 	},
 });
+}
