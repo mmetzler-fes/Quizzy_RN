@@ -4,6 +4,7 @@
   "main": "index.js",
   "description": "Quizzy Learning App with Network Sync",
   "author": "mmetzler",
+  "license": "GPL-3.0-or-later",
   "private": true,
   "scripts": {
     "api": "node run-server.js",

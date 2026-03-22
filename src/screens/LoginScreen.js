@@ -237,6 +237,10 @@ export default function LoginScreen({ navigation }) {
 							>
 								<Text style={[styles.adminLinkText, { color: colors.error }]}>🔐 Zum Lehrer-Bereich</Text>
 							</TouchableOpacity>
+
+							<Text style={[styles.creditText, { color: colors.textMuted }]}>
+								Designed by Martin Metzler, implementation assisted by AI.
+							</Text>
 						</View>
 					</Animated.View>
 				</ScrollView>
@@ -371,5 +375,11 @@ const styles = StyleSheet.create({
 		color: COLORS.error,
 		fontSize: FONTS.sizes.sm,
 		fontWeight: FONTS.weights.bold,
+	},
+	creditText: {
+		fontSize: FONTS.sizes.xs,
+		textAlign: 'center',
+		marginTop: SPACING.lg,
+		opacity: 0.5,
 	},
 });

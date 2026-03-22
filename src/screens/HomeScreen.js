@@ -41,6 +41,7 @@ export default function HomeScreen({ onStart }) {
         </TouchableOpacity>
 
         <Text style={styles.hint}>Choose the correct answer for each question</Text>
+        <Text style={styles.credit}>Designed by Martin Metzler, implementation assisted by AI.</Text>
       </View>
     </SafeAreaView>
   );
@@ -133,5 +134,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
+  },
+  credit: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.45)',
+    textAlign: 'center',
+    marginTop: 16,
   },
 });
